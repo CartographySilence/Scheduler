@@ -1,0 +1,9 @@
+{
+  "processors": 2,
+  "tasks": [
+    { "id": "a", "duration": 3, "deadline": 6 },
+    { "id": "b", "duration": 4, "deadline": 12, "after": ["a"] },
+    { "id": "c", "duration": 2, "deadline": 12, "after": ["a"] },
+    { "id": "d", "duration": 5, "deadline": 20, "after": ["b", "c"] }
+  ]
+}

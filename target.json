@@ -1,0 +1,15 @@
+{
+  "processors": 4,
+  "tasks": [
+    { "id": "ingest",    "duration": 5,  "deadline": 12 },
+    { "id": "validate",  "duration": 3,  "deadline": 20, "after": ["ingest"] },
+    { "id": "transform", "duration": 8,  "deadline": 40, "after": ["validate"] },
+    { "id": "enrich",    "duration": 6,  "deadline": 40, "after": ["validate"] },
+    { "id": "featureA",  "duration": 4,  "deadline": 55, "after": ["transform"] },
+    { "id": "featureB",  "duration": 7,  "deadline": 55, "after": ["transform", "enrich"] },
+    { "id": "join",      "duration": 5,  "deadline": 70, "after": ["featureA", "featureB"] },
+    { "id": "train",     "duration": 15, "deadline": 100, "after": ["join"] },
+    { "id": "evaluate",  "duration": 4,  "deadline": 110, "after": ["train"] },
+    { "id": "report",    "duration": 2,  "deadline": 120, "after": ["evaluate", "enrich"] }
+  ]
+}
