@@ -23,20 +23,31 @@ public class Main {
         String json = args.length > 0 ? Files.readString(Path.of(args[0])) : OVERTIGHT;
         Spec spec = new SpecParser().parse(json);
 
-        Scheduler.LateResult r = new Scheduler().solveLateness(spec, true);
-        if (!r.solved()) {
+        long tOff = System.nanoTime();
+        Scheduler.LateResult off = new Scheduler().solveLateness(spec, false);
+        long msOff = (System.nanoTime() - tOff) / 1000000;
+
+        long tOn = System.nanoTime();
+        Scheduler.LateResult on = new Scheduler().solveLateness(spec, true);
+        long msOn = (System.nanoTime() - tOn) / 1000000;
+
+        System.out.printf("%n  %ssymmetry breaking%s   OFF: %d ms    ON: %d ms%n", BOLD, RESET, msOff, msOn);
+        if (msOff > 0) {
+            System.out.printf("  speedup: %.2fx%n", (double) msOff / Math.max(1, msOn));
+        }
+
+        if (!on.solved()) {
             System.out.println("infeasible even with lateness (precedence cycle?)");
             return;
         }
-        printGantt(r.assignments(), spec.processors());
+        printGantt(on.assignments(), spec.processors());
     }
 
     private static void printGantt(List<LateAssignment> tasks, int cores) {
         long makespan = tasks.stream().mapToLong(LateAssignment::end).max().orElse(0);
         int width = (int) makespan * CELL;
 
-        System.out.println("\n" + BOLD + "  schedule" + RESET + DIM
-                + "   (green = on time, red = past deadline)" + RESET);
+        System.out.println("\n" + BOLD + "  schedule" + RESET + DIM + "   (green = on time, red = past deadline)" + RESET);
 
         StringBuilder axis = new StringBuilder("        ");
         for (long t = 0; t <= makespan; t += 5) axis.append(pad(Long.toString(t), 5 * CELL));
@@ -93,7 +104,7 @@ public class Main {
 
     private static final String OVERTIGHT = """
 {
-  "processors": 1,
+  "processors": 6,
   "tasks": [
     { "id": "boot", "duration": 3, "deadline": 3 },
     { "id": "auth", "duration": 4, "deadline": 8,  "after": ["boot"] },
