@@ -1,9 +1,13 @@
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/Main.java
+/home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/Samples.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/bench/BenchResult.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/bench/BenchRunner.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/bench/Benchmark.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/bench/Generator.java
+/home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/cli/GanttView.java
+/home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/cli/ModeComparison.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/encode/Encoder.java
+/home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/encode/TextEncoder.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/ground/Grounder.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/ground/NoGround.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/ground/RustGrounder.java
