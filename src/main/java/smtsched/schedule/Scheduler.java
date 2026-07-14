@@ -6,7 +6,10 @@ import com.microsoft.z3.Solver;
 import com.microsoft.z3.Status;
 
 import smtsched.encode.Encoder;
+import smtsched.encode.TextEncoder;
+import smtsched.ground.Grounder;
 import smtsched.spec.Spec;
+
 
 import java.util.List;
 
@@ -27,6 +30,8 @@ public class Scheduler {
             return new Result(false, List.of());
         }
     }
+
+
 
     public LateResult solveLateness(Spec spec, boolean symmetryBreaking) {
         try (Context ctx = new Context()) {

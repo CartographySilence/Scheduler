@@ -1,5 +1,5 @@
 package smtsched.ground;
 
-public class Grounder {
-    
+public interface Grounder {
+    String ground(String smtlib);
 }

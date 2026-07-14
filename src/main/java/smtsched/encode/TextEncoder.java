@@ -8,13 +8,13 @@ import java.util.List;
 import java.util.Map;
 
 
-public class SmtLibEmitter {
+public class TextEncoder {
     private final Spec spec;
     private final List<String> names = new ArrayList<>();
     private final Map<String, Integer> index = new HashMap<>();
     private final boolean symmetryBreaking;
 
-    public SmtLibEmitter(Spec spec, boolean symmetryBreaking) {
+    public TextEncoder(Spec spec, boolean symmetryBreaking) {
         this.spec = spec;
         this.symmetryBreaking = symmetryBreaking;
         for (Spec.TaskDef t : spec.tasks()) {
@@ -35,21 +35,30 @@ public class SmtLibEmitter {
         return index.get(taskID);
     }
 
-    public String emit() {
+    public String encode() {
         int n = names.size();
         int cores = spec.processors();
         StringBuilder s = new StringBuilder();
 
         s.append("(set-logic UFLIA)\n");
         s.append("(set-option :produce-models true)\n\n");
+
+        // Decision Vars 
+        s.append("(declare-fun start (Int) Int)\n");
+        s.append("(declare-fun proc (Int) Int)\n\n");
+
+
+        // Task Data 
         s.append("(declare-fun dur (Int) Int)\n");
         s.append("(declare-fun dl (Int) Int)\n");
 
+        // Data itself, duration and dealine per task
         for (int i = 0; i < n; i++) {
             Spec.TaskDef t = spec.tasks().get(i);
             s.append("(assert (= (dur ").append(i).append(") ").append(t.duration()).append("))").append("   ; ").append(t.id()).append('\n');s.append("(assert (= (dl ").append(i).append(") ").append(t.deadline()).append("))\n");
         } 
         s.append('\n');
+
 
         s.append("(assert (forall ((i Int))\n");
         s.append("(=> (and (<= 0 i) (< i ").append(n).append("))\n");
@@ -58,12 +67,14 @@ public class SmtLibEmitter {
         s.append("(>= (proc i) 0)\n");
         s.append("(< (proc i) ").append(cores).append(")))))\n\n");
 
+        //  No two tasks overlap on the same core
         s.append("(assert (forall ((i Int) (j Int))\n");
         s.append("(=> (and (<= 0 i) (< i j) (< j ").append(n).append("))\n");
         s.append("(or (distinct (proc i) (proc j))\n");
         s.append("(<= (+ (start i) (dur i)) (start j))\n");
         s.append("(<= (+ (start j) (dur j)) (start i))))))\n\n");
 
+        // Precedence list
         List<String> edges = new ArrayList<>();
         for(Spec.TaskDef t : spec.tasks()) {
             for (String dependancy : t.after()) {
