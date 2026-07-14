@@ -19,7 +19,7 @@ import java.util.List;
  */
 public class Scheduler {
 
-    private static final int TIMEOUT_MS = 10_000;
+    private static final int TIMEOUT_MS = 100000;
 
     public enum Outcome { SCHEDULABLE, UNSCHEDULABLE, TIMEOUT }
 
