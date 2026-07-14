@@ -36,7 +36,7 @@ public class Encoder {
         }
     }
 
-    // ---- entry points ----
+
 
     /** Hard-deadline satisfiability. */
     public void assertInto(Solver solver) {
@@ -52,7 +52,6 @@ public class Encoder {
         addLateness(opt);
     }
 
-    // ---- shared constraints
 
     private void addCore(Consumer<BoolExpr> add) {
         IntNum zero  = ctx.mkInt(0);
