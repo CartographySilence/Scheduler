@@ -109,8 +109,12 @@ public class Encoder {
         opt.MkMinimize(total);
     }
 
-    /** Schedulability-preserving symmetry breaking (value precedence). */
     private void addSymmetry(Consumer<BoolExpr> add) {
+        addCoreSymmetry(add);
+        addTaskSymmetry(add);
+    }
+
+    private void addCoreSymmetry(Consumer<BoolExpr> add) {
         List<Spec.TaskDef> ts = spec.tasks();
         if (ts.isEmpty()) return;
 
@@ -127,6 +131,30 @@ public class Encoder {
         }
     }
 
+    private void addTaskSymmetry(Consumer<BoolExpr> add) {
+        // tasks that other tasks depend on — these are not interchangeable
+        Set<String> depended = new HashSet<>();
+        for (Spec.TaskDef t : spec.tasks()) {
+            depended.addAll(t.after());
+        }
+
+        // group the free, identical tasks by (duration, deadline)
+        Map<String, List<Spec.TaskDef>> classes = new LinkedHashMap<>();
+        for (Spec.TaskDef t : spec.tasks()) {
+            boolean free = t.after().isEmpty() && !depended.contains(t.id());
+            if (!free) continue;
+            classes.computeIfAbsent(t.duration() + ":" + t.deadline(), k -> new ArrayList<>()).add(t);
+        }
+
+        // within each class, pin an arbitrary but fixed start order
+        for (List<Spec.TaskDef> group : classes.values()) {
+            for (int i = 0; i + 1 < group.size(); i++) {
+                IntExpr a = start.get(group.get(i).id());
+                IntExpr b = start.get(group.get(i + 1).id());
+                add.accept(ctx.mkLe(a, b));
+            }
+        }
+    }
 
     public List<Assignment> decode(Model model) {
         List<Assignment> out = new ArrayList<>();

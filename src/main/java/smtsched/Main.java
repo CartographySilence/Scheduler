@@ -11,9 +11,9 @@ import java.nio.file.Path;
 
 /**
  * Usage:
- *   mvn compile exec:java                          -> schedule the sample, draw the chart
- *   mvn compile exec:java -Dexec.args="spec.json"  -> schedule a file
- *   mvn compile exec:java -Dexec.args="spec.json --compare"  -> mode timing table
+ *   mvn compile exec:java -> schedule the sample, draw the chart
+ *   mvn compile exec:java -Dexec.args="spec.json" -> schedule a file
+ *   mvn compile exec:java -Dexec.args="spec.json --compare" -> mode timing table
  */
 public class Main {
 
@@ -21,7 +21,7 @@ public class Main {
         boolean compare = args.length > 0 && args[args.length - 1].equals("--compare");
         String file = (args.length > 0 && !args[0].startsWith("--")) ? args[0] : null;
 
-        String json = (file != null) ? Files.readString(Path.of(file)) : Samples.PIPELINE;
+        String json = (file != null) ? Files.readString(Path.of(file)) : Samples.BIG;
         Spec spec = new SpecParser().parse(json);
 
         if (compare) {
@@ -31,7 +31,7 @@ public class Main {
 
         Scheduler.LateResult result = new Scheduler().solveLateness(spec, true);
         if (!result.solved()) {
-            System.out.println("infeasible even with lateness (precedence cycle?)");
+            System.out.println("you're taking too long! 🎃🎃🎃🎃🎃");
             return;
         }
         GanttView.print(result.assignments(), spec.processors());
