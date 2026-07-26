@@ -10,8 +10,6 @@ import java.util.function.Supplier;
  * Runs the same spec through each encoding mode and prints a timing table.
  *
  * Modes: hand-ground (object encoder, n^2 loop) vs quantified text handed to z3.
- * Each with symmetry breaking off and on. The xmt-lib row slots in here once the
- * binary exists — it is the same solveText call with a different Grounder.
  */
 public final class ModeComparison {
 

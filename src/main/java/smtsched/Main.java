@@ -54,18 +54,13 @@ public class Main {
                 }
             }
 
-            case TIMEOUT -> System.out.println("Gave up — couldn't decide within the time budget. 🎃");
+            case TIMEOUT -> System.out.println("Couldn't decide within the time budget.");
         }
     }
 
     /** A hard-SAT schedule meets every deadline, so lateness is zero throughout. */
     private static List<LateAssignment> toLate(List<Encoder.Assignment> assignments, Spec spec) {
-        Map<String, Long> deadlines = spec.tasks().stream()
-                .collect(Collectors.toMap(Spec.TaskDef::id, Spec.TaskDef::deadline));
-
-        return assignments.stream()
-                .map(a -> new LateAssignment(a.task(), a.core(), a.start(), a.end(),
-                                             deadlines.get(a.task()), 0))
-                .toList();
+        Map<String, Long> deadlines = spec.tasks().stream().collect(Collectors.toMap(Spec.TaskDef::id, Spec.TaskDef::deadline));
+        return assignments.stream().map(a -> new LateAssignment(a.task(), a.core(), a.start(), a.end(),deadlines.get(a.task()), 0)).toList();
     }
 }

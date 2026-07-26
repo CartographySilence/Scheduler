@@ -13,9 +13,9 @@ import java.util.List;
 /**
  * Runs an encoding through z3.
  *
- *   solve — baseline with eager grounder
- *   solveText — quantified SMT-LIB text, optionally grounded first.
- *   solveLateness — used when schedule is UNSAT
+ *   solve: baseline with eager grounder
+ *   solveText: quantified SMT-LIB text, optionally grounded first.
+ *   solveLateness: used when schedule is UNSAT
  */
 public class Scheduler {
 

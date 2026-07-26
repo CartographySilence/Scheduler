@@ -55,7 +55,17 @@ public class TextEncoder {
         // Data itself, duration and dealine per task
         for (int i = 0; i < n; i++) {
             Spec.TaskDef t = spec.tasks().get(i);
-            s.append("(assert (= (dur ").append(i).append(") ").append(t.duration()).append("))").append("   ; ").append(t.id()).append('\n');s.append("(assert (= (dl ").append(i).append(") ").append(t.deadline()).append("))\n");
+            s.append("(assert (= (dur ")
+            .append(i).append(") ")
+            .append(t.duration())
+            .append("))").append("   ; ")
+            .append(t.id()).append('\n');
+
+            s.append("(assert (= (dl ").
+            append(i).
+            append(") ").
+            append(t.deadline()).
+            append("))\n");
         } 
         s.append('\n');
 
