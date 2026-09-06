@@ -6,10 +6,26 @@ import smtsched.spec.Spec;
 import java.util.*;
 import java.util.function.Consumer;
 
+/**
+ *
+ * Encoder
+ * Builds the SMT encoding of a scheduling {@link Spec} for Z3 and decodes solved models back into concrete schedules
+ * Variables (one entry pair per task)
+ * {@code start_T}: integer start time
+ * {@code proc_T}: integer core index, {@code 0 <= proc_T < cores}
+ * {@code late_T}: integer lateness, only created for when soft-deadlines are used
+ *
+ * Two independent problem formulations share the same core constraints:
+ *
+ * Hard-SAT: Every task must meet its deadline 
+ * Soft-deadlines: deadlines can be missed, solver aims to minimise total lateness across all tasks
+ */
 public class Encoder {
 
+    /** A decoded hard-SAT entry for a single task */
     public record Assignment(String task, int core, long start, long end) {}
 
+    /** A decoded soft-deadline entry, including how late the tasks will be */
     public record LateAssignment(String task, int core, long start, long end, long deadline, long late) {
         public boolean isLate() { return late > 0; }
     }
@@ -24,6 +40,15 @@ public class Encoder {
     private final Map<String, Long> dur = new LinkedHashMap<>();
     private final Map<String, Long> dl = new LinkedHashMap<>();
 
+
+
+    /**
+     * Decalres one {@code start}/{@code proc} integer variable per task and caches 
+     * each tasks duration for reuse in constraint building and decoding
+     * @param ctx
+     * @param spec
+     * @param isSymmetryBreaking
+     */
     public Encoder(Context ctx, Spec spec, boolean isSymmetryBreaking) {
         this.ctx = ctx;
         this.spec = spec;
@@ -111,7 +136,6 @@ public class Encoder {
 
     private void addSymmetry(Consumer<BoolExpr> add) {
         addCoreSymmetry(add);
-        addTaskSymmetry(add);
     }
 
     private void addCoreSymmetry(Consumer<BoolExpr> add) {
@@ -131,36 +155,13 @@ public class Encoder {
         }
     }
 
-    private void addTaskSymmetry(Consumer<BoolExpr> add) {
-        // tasks that other tasks depend on — these are not interchangeable
-        Set<String> depended = new HashSet<>();
-        for (Spec.TaskDef t : spec.tasks()) {
-            depended.addAll(t.after());
-        }
-
-        // group the free, identical tasks by (duration, deadline)
-        Map<String, List<Spec.TaskDef>> classes = new LinkedHashMap<>();
-        for (Spec.TaskDef t : spec.tasks()) {
-            boolean free = t.after().isEmpty() && !depended.contains(t.id());
-            if (!free) continue;
-            classes.computeIfAbsent(t.duration() + ":" + t.deadline(), k -> new ArrayList<>()).add(t);
-        }
-
-        // within each class, pin an arbitrary but fixed start order
-        for (List<Spec.TaskDef> group : classes.values()) {
-            for (int i = 0; i + 1 < group.size(); i++) {
-                IntExpr a = start.get(group.get(i).id());
-                IntExpr b = start.get(group.get(i + 1).id());
-                add.accept(ctx.mkLe(a, b));
-            }
-        }
-    }
+    
 
     public List<Assignment> decode(Model model) {
         List<Assignment> out = new ArrayList<>();
         for (Spec.TaskDef t : spec.tasks()) {
             long s = ((IntNum) model.evaluate(start.get(t.id()), false)).getInt64();
-            int  p = (int) ((IntNum) model.evaluate(proc.get(t.id()), false)).getInt64();
+            int p = (int) ((IntNum) model.evaluate(proc.get(t.id()), false)).getInt64();
             out.add(new Assignment(t.id(), p, s, s + t.duration()));
         }
         return out;
@@ -170,7 +171,7 @@ public class Encoder {
         List<LateAssignment> out = new ArrayList<>();
         for (Spec.TaskDef t : spec.tasks()) {
             long s = ((IntNum) model.evaluate(start.get(t.id()), false)).getInt64();
-            int  p = (int) ((IntNum) model.evaluate(proc.get(t.id()), false)).getInt64();
+            int p = (int) ((IntNum) model.evaluate(proc.get(t.id()), false)).getInt64();
             long l = ((IntNum) model.evaluate(late.get(t.id()), false)).getInt64();
             out.add(new LateAssignment(t.id(), p, s, s + t.duration(), dl.get(t.id()), l));
         }

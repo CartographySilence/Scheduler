@@ -6,7 +6,7 @@ import smtsched.encode.Encoder;
 import smtsched.encode.TextEncoder;
 import smtsched.ground.Grounder;
 import smtsched.spec.Spec;
-
+import smtsched.encode.XmtEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,9 +46,9 @@ public class Scheduler {
     }
 
     /**
-     * Text path: emit quantified SMT-LIB, ground it, parse it back into z3.
-     * Pass NoGround to hand the quantifiers straight to z3 (its own E-matching);
-     * pass RustGrounder to have xmt-lib expand them first.
+     * Text path: add quantifiers, ground it, parse it back into z3.
+     * Or... hand quantifiers into z3 without groudning htem
+     * Or... use the XMTLib grounder 
      */
     public Result solveText(Spec spec, boolean symmetryBreaking, Grounder grounder) {
         TextEncoder encoder = new TextEncoder(spec, symmetryBreaking);
@@ -65,7 +65,22 @@ public class Scheduler {
         }
     }
 
-    /** Soft deadlines: everyone is placed, total lateness minimised. */
+    public Result solveGrounded(Spec spec, boolean symmetryBreaking, Grounder grounder) {
+        XmtEncoder encoder = new XmtEncoder(spec, symmetryBreaking);
+        String grounded = stripUnusedDeclarations(grounder.ground(encoder.encode()));
+
+        try (Context ctx = new Context()) {
+            Solver z3 = newSolver(ctx);
+            z3.add(ctx.parseSMTLIB2String(grounded, null, null, null, null));
+
+            Status status = z3.check();
+            return status == Status.SATISFIABLE
+                ? new Result(Outcome.SCHEDULABLE, decodeText(ctx, z3.getModel(), encoder, spec))
+                : Result.unsolved(outcomeOf(status));
+        }
+    }
+
+    /** Soft deadlines: focuses on minimizing amount late under the event that schedulability is not feasible */
     public LateResult solveLateness(Spec spec, boolean symmetryBreaking) {
         try (Context ctx = new Context()) {
             Optimize opt = ctx.mkOptimize();
@@ -108,7 +123,23 @@ public class Scheduler {
     private List<Encoder.Assignment> decodeText(Context ctx, Model model, TextEncoder encoder, Spec spec) {
         IntSort intSort = ctx.getIntSort();
         FuncDecl<IntSort> start = ctx.mkFuncDecl("start", new Sort[]{ intSort }, intSort);
-        FuncDecl<IntSort> proc  = ctx.mkFuncDecl("proc",  new Sort[]{ intSort }, intSort);
+        FuncDecl<IntSort> proc = ctx.mkFuncDecl("proc", new Sort[]{ intSort }, intSort);
+
+        List<Encoder.Assignment> out = new ArrayList<>();
+        for (int i = 0; i < encoder.taskCount(); i++) {
+            long s = ((IntNum) model.evaluate(start.apply(ctx.mkInt(i)), true)).getInt64();
+            int c = (int) ((IntNum) model.evaluate(proc.apply(ctx.mkInt(i)), true)).getInt64();
+            long dur = spec.tasks().get(i).duration();
+
+            out.add(new Encoder.Assignment(encoder.taskName(i), c, s, s + dur));
+        }
+        return out;
+    }
+
+    private List<Encoder.Assignment> decodeText(Context ctx, Model model, XmtEncoder encoder, Spec spec) {
+        IntSort intSort = ctx.getIntSort();
+        FuncDecl<IntSort> start = ctx.mkFuncDecl("start", new Sort[]{ intSort }, intSort);
+        FuncDecl<IntSort> proc = ctx.mkFuncDecl("proc",  new Sort[]{ intSort }, intSort);
 
         List<Encoder.Assignment> out = new ArrayList<>();
         for (int i = 0; i < encoder.taskCount(); i++) {
@@ -120,4 +151,12 @@ public class Scheduler {
         }
         return out;
     }
+
+    private String stripUnusedDeclarations(String smtlib) {
+        return smtlib.lines()
+                .filter(line -> !line.startsWith("(declare-fun Task") && !line.startsWith("(declare-fun Pair"))
+                .reduce(new StringBuilder(), (sb, line) -> sb.append(line).append('\n'), StringBuilder::append)
+                .toString();
+    }
+
 }

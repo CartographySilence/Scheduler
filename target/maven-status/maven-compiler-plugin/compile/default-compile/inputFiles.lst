@@ -8,6 +8,7 @@
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/cli/ModeComparison.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/encode/Encoder.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/encode/TextEncoder.java
+/home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/encode/XmtEncoder.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/ground/Grounder.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/ground/NoGround.java
 /home/walluweenie/Scheduler/Scheduler/src/main/java/smtsched/ground/RustGrounder.java

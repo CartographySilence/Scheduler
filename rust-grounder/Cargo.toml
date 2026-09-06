@@ -1,0 +1,10 @@
+[package]
+name = "rust-grounder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+xmt-lib = "0.1.2"
+
+[features]
+static-link-z3 = ["xmt-lib/static-link-z3"]

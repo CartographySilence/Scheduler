@@ -1,9 +1,12 @@
 package smtsched.cli;
 
 import smtsched.schedule.Scheduler;
+import smtsched.ground.Grounder;
 import smtsched.ground.NoGround;
+import smtsched.ground.RustGrounder;
 import smtsched.spec.Spec;
 
+import java.nio.file.Path;
 import java.util.function.Supplier;
 
 /**
@@ -27,7 +30,9 @@ public final class ModeComparison {
         for (boolean sym : new boolean[]{ false, true })
             time("quantified", sym, () -> scheduler.solveText(spec, sym, new NoGround()));
 
-        // TODO: xmt-lib
+        Grounder xmt = new RustGrounder(Path.of("rust-grounder/target/release/rust-grounder"));
+        for (boolean sym : new boolean[]{ false, true })
+            time("grounded (xmt-lib)", sym, () -> scheduler.solveGrounded(spec, sym, xmt));
     }
 
     private static void time(String label, boolean symmetry, Supplier<Scheduler.Result> run) {
