@@ -64,10 +64,19 @@ public class Encoder {
 
 
     /** Hard-deadline satisfiability. */
-    public void assertInto(Solver solver) {
+        public void assertBaseInto(Solver solver) {
         addCore(solver::add);
         addHardDeadlines(solver::add);
-        if (isSymmetryBreaking) addSymmetry(solver::add);
+    }
+
+    public void assertCoreSymmetryInto(Solver solver, int[] sigma) {
+        addCoreSymmetry(solver::add, sigma);
+    }
+
+    /** Hard-deadline satisfiability. */
+    public void assertInto(Solver solver) {
+        assertBaseInto(solver);
+        if (isSymmetryBreaking) assertCoreSymmetryInto(solver, derivePermutationFromGreedy());
     }
 
     /** Soft-deadline lateness minimisation. */
