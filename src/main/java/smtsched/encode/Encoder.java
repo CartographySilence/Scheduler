@@ -135,27 +135,138 @@ public class Encoder {
     }
 
     private void addSymmetry(Consumer<BoolExpr> add) {
-        addCoreSymmetry(add);
+        addCoreSymmetry(add, derivePermutationFromGreedy());
     }
 
-    private void addCoreSymmetry(Consumer<BoolExpr> add) {
+    private void addCoreSymmetry(Consumer<BoolExpr> add, int[] sigma) {
         List<Spec.TaskDef> ts = spec.tasks();
-        if (ts.isEmpty()) return;
+        if(ts.isEmpty()) return;
 
-        IntExpr first = proc.get(ts.get(0).id());
-        add.accept(ctx.mkEq(first, ctx.mkInt(0)));
+        IntExpr canon0 = canonExpr(ts.get(0), sigma, add);
+        add.accept(ctx.mkEq(canon0, ctx.mkInt(0)));
 
-        IntExpr prevMax = first;
-        for (int i = 1; i < ts.size(); i++) {
-            IntExpr pi = proc.get(ts.get(i).id());
-            add.accept(ctx.mkLe(pi, ctx.mkAdd(prevMax, ctx.mkInt(1))));
-            IntExpr maxI = ctx.mkIntConst("maxUsed_" + i);
-            add.accept(ctx.mkEq(maxI, ctx.mkITE(ctx.mkGt(pi, prevMax), pi, prevMax)));
+        IntExpr prevMax = canon0;
+        for(int i = 1; i < ts.size(); i++) {
+            IntExpr canonI = canonExpr(ts.get(i), sigma, add);
+            add.accept(ctx.mkLe(canonI, ctx.mkAdd(prevMax, ctx.mkInt(1))));
+            IntExpr maxI = (IntExpr) ctx.mkFreshConst("maxUsed", ctx.getIntSort());
+            add.accept(ctx.mkEq(maxI, ctx.mkITE(ctx.mkGt(canonI, prevMax), canonI, prevMax)));
             prevMax = maxI;
         }
+
     }
 
+    private IntExpr canonExpr(Spec.TaskDef t, int[] sigma, Consumer<BoolExpr> add) {
+        IntExpr p = proc.get(t.id());
+        IntExpr canon = (IntExpr) ctx.mkFreshConst("canon_" + t.id(), ctx.getIntSort());
+
+        Expr<IntSort> chain = ctx.mkInt(sigma[sigma.length - 1]);
+        for(int k = sigma.length - 2; k >= 0; k--) {
+            chain = ctx.mkITE(ctx.mkEq(p, ctx.mkInt(k)), ctx.mkInt(sigma[k]), chain);
+        }
+
+        add.accept(ctx.mkEq(canon, chain));
+        return canon;
+    }
+
+
+    /**
+     * Approach 1: derive a permutation from a greedy list, so the canonical label has a higher chance of lining up with Z3's own search
+     * and what it is likely to find, instead of forcing task-index order
+    */
     
+    private int[] derivePermutationFromGreedy() {
+        int n = spec.processors();
+        Map<String, Integer> greedyCore = greedySchedule();
+
+        int[] sigma = new int[n];
+        Arrays.fill(sigma, -1);
+        boolean[] used = new boolean[n];
+        int nextLabel = 0;
+
+        for(Spec.TaskDef t : spec.tasks()) {
+            int c = greedyCore.get(t.id());
+            if(!used[c]) {
+                used[c] = true;
+                sigma[c] = nextLabel++;
+            }
+        }
+
+        for(int c = 0; c < n; c++) {
+            if (sigma[c] == -1) {
+                sigma[c] = nextLabel++;
+            }
+        }
+        return sigma;
+    }
+
+
+    private Map<String, Integer> greedySchedule() {
+        List<Spec.TaskDef> topo = topologicalOrder();
+        int n = spec.processors();
+        long[] coreFree = new long[n];
+        Map<String, Long> finish = new HashMap<>();
+        Map<String, Integer> core = new HashMap<>();
+
+        for(Spec.TaskDef t : topo) {
+            long earliestStart = 0;
+
+            for (String dep : t.after()) {
+                earliestStart = Math.max(earliestStart, finish.get(dep));
+            }
+
+            int bestCore = 0;
+            long bestStart = Math.max(earliestStart, coreFree[0]);
+            for (int c = 1; c < n; c++) {
+                long s = Math.max(earliestStart, coreFree[c]);
+
+                if (s < bestStart) { 
+                    bestStart = s; bestCore = c; 
+                }
+            }
+
+            long f = bestStart + t.duration();
+            coreFree[bestCore] = f;
+            finish.put(t.id(), f);
+            core.put(t.id(), bestCore);
+        }
+
+        return core;
+    }
+
+
+    /** Khan's algorithm */
+    private List<Spec.TaskDef> topologicalOrder() {
+        Map<String, Spec.TaskDef> byId = new LinkedHashMap<>();
+        Map<String, Integer> indegree = new HashMap<>();
+        Map<String, List<String>> dependents = new HashMap<>();
+
+        for(Spec.TaskDef t : spec.tasks()) {
+            byId.put(t.id(), t);
+            indegree.put(t.id(), t.after().size());
+            for (String dep : t.after()) dependents.computeIfAbsent(dep, k -> new ArrayList<>()).add(t.id());
+        }
+
+        Deque<String> ready = new ArrayDeque<>();
+        for (Spec.TaskDef t : spec.tasks()) {
+            if (indegree.get(t.id()) == 0) {
+                ready.add(t.id());
+            }
+        }
+
+        List<Spec.TaskDef> order = new ArrayList<>();
+        while(!ready.isEmpty()) {
+            String id = ready.poll();
+            order.add(byId.get(id));
+            for(String dep : dependents.getOrDefault(id, List.of())) {
+                if(indegree.merge(dep, -1, Integer::sum) == 0) {
+                    ready.add(dep);
+                }
+            }
+        }
+        return order;
+    }
+
 
     public List<Assignment> decode(Model model) {
         List<Assignment> out = new ArrayList<>();
