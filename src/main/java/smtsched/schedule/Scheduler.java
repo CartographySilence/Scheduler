@@ -9,6 +9,7 @@ import smtsched.spec.Spec;
 import smtsched.encode.XmtEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Runs an encoding through z3.
@@ -20,6 +21,8 @@ import java.util.List;
 public class Scheduler {
 
     private static final int TIMEOUT_MS = 40000;
+    public static final int RESTART_SLICE_MS = 3000;
+    private static final int RESTART_MAX_SLICES = 4;
 
     public enum Outcome { SCHEDULABLE, UNSCHEDULABLE, TIMEOUT }
 
@@ -43,6 +46,45 @@ public class Scheduler {
                     ? new Result(Outcome.SCHEDULABLE, encoder.decode(z3.getModel()))
                     : Result.unsolved(outcomeOf(status));
         }
+    }
+
+    public Result solveWithRestarts(Spec spec) {
+        try (Context ctx = new Context()) {
+            Encoder encoder = new Encoder(ctx, spec, false); // symmetry applied manually per slice below
+            Solver z3 = ctx.mkSolver();
+
+            Params sliceParams = ctx.mkParams();
+            sliceParams.add("timeout", RESTART_SLICE_MS);
+            z3.setParameters(sliceParams);
+
+            encoder.assertBaseInto(z3);
+
+            Random rng = new Random();
+            for (int slice = 0; slice < RESTART_MAX_SLICES; slice++) {
+                z3.push();
+                encoder.assertCoreSymmetryInto(z3, randomPermutation(spec.processors(), rng));
+
+                Status status = z3.check();
+                if (status == Status.SATISFIABLE) {
+                    return new Result(Outcome.SCHEDULABLE, encoder.decode(z3.getModel()));
+                }
+                if (status == Status.UNSATISFIABLE) {
+                    return Result.unsolved(Outcome.UNSCHEDULABLE);
+                }
+                z3.pop(); // UNKNOWN only — discard this slice's symmetry constraints, try a new permutation
+            }
+            return Result.unsolved(Outcome.TIMEOUT);
+        }
+    }
+
+    private static int[] randomPermutation(int n, Random rng) {
+        int[] p = new int[n];
+        for (int i = 0; i < n; i++) p[i] = i;
+        for (int i = n - 1; i > 0; i--) {
+            int j = rng.nextInt(i + 1);
+            int tmp = p[i]; p[i] = p[j]; p[j] = tmp;
+        }
+        return p;
     }
 
     /**
