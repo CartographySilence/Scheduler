@@ -36,10 +36,19 @@ public final class Generator {
 
         List<List<String>> after = new ArrayList<>();
         for (int j = 0; j < nTasks; j++) {
-            List<String> preds = new ArrayList<>();
-            for (int i = 0; i < j && preds.size() < 3; i++) {
-                if (rng.nextDouble() < density) preds.add("T" + i);
+         
+            List<Integer> candidates = new ArrayList<>();
+            for (int i = 0; i < j; i++) {
+                if (rng.nextDouble() < density) candidates.add(i);
             }
+
+            if (candidates.size() > 3) {
+                Collections.shuffle(candidates, rng);
+                candidates = candidates.subList(0, 3);
+            }
+            Collections.sort(candidates);
+            List<String> preds = new ArrayList<>();
+            for (int i : candidates) preds.add("T" + i);
             after.add(preds);
         }
 
