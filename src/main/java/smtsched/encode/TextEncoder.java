@@ -109,17 +109,33 @@ public class TextEncoder {
 
 
     private String symmetryBreak(int n) {
+        int[] sigma = CorePermutation.fromGreedySchedule(spec);
         StringBuilder s = new StringBuilder();
+
+        s.append("(declare-fun canon (Int) Int)\n");
+        for (int i = 0; i < n; i++) {
+            s.append("(assert (= (canon ").append(i).append(") ").append(canonIte(i, sigma)).append("))\n");
+        }
+        s.append('\n');
+
         s.append("(declare-fun maxUsed (Int) Int)\n");
-        s.append("(assert (= (proc 0) 0))\n");
+        s.append("(assert (= (canon 0) 0))\n");
         s.append("(assert (= (maxUsed 0) 0))\n");
         for (int i = 1; i < n; i++) {
-            s.append("(assert (<= (proc ").append(i).append(") (+ (maxUsed ").append(i - 1).append(") 1)))\n");
-            s.append("(assert (= (maxUsed ").append(i).append(") (ite (> (proc ").append(i)
-             .append(") (maxUsed ").append(i - 1).append(")) (proc ").append(i)
+            s.append("(assert (<= (canon ").append(i).append(") (+ (maxUsed ").append(i - 1).append(") 1)))\n");
+            s.append("(assert (= (maxUsed ").append(i).append(") (ite (> (canon ").append(i)
+             .append(") (maxUsed ").append(i - 1).append(")) (canon ").append(i)
              .append(") (maxUsed ").append(i - 1).append("))))\n");
         }
         return s.append('\n').toString();
     }
-    
+
+    private static String canonIte(int taskIndex, int[] sigma) {
+        String chain = String.valueOf(sigma[sigma.length - 1]);
+        for (int k = sigma.length - 2; k >= 0; k--) {
+            chain = "(ite (= (proc " + taskIndex + ") " + k + ") " + sigma[k] + " " + chain + ")";
+        }
+        return chain;
+    }
+
 }

@@ -1,7 +1,6 @@
-package smtsched.test.java.smtsched;
+package smtsched.bench;
 
 import org.junit.jupiter.api.Test;
-import smtsched.bench.Generator;
 import smtsched.spec.Spec;
 
 import java.util.HashSet;

@@ -2,11 +2,13 @@ package smtsched.schedule;
 
 import com.microsoft.z3.*;
 
+import smtsched.encode.CorePermutation;
 import smtsched.encode.Encoder;
 import smtsched.encode.TextEncoder;
+import smtsched.encode.XmtEncoder;
 import smtsched.ground.Grounder;
 import smtsched.spec.Spec;
-import smtsched.encode.XmtEncoder;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -32,8 +34,6 @@ public class Scheduler {
 
     public record LateResult(boolean solved, List<Encoder.LateAssignment> assignments) {}
 
-  
-
     /** Baseline: object encoder, deadlines hard. */
     public Result solve(Spec spec, boolean symmetryBreaking) {
         try (Context ctx = new Context()) {
@@ -48,7 +48,17 @@ public class Scheduler {
         }
     }
 
+    /** Every slice picks an independent random permutation. */
     public Result solveWithRestarts(Spec spec) {
+        return solveWithRestarts(spec, false);
+    }
+
+    /** Slice 0 uses the greedy-derived permutation (Approach 1's best guess); later slices fall back to random. */
+    public Result solveWithHybridRestarts(Spec spec) {
+        return solveWithRestarts(spec, true);
+    }
+
+    private Result solveWithRestarts(Spec spec, boolean greedyFirst) {
         try (Context ctx = new Context()) {
             Encoder encoder = new Encoder(ctx, spec, false); // symmetry applied manually per slice below
             Solver z3 = ctx.mkSolver();
@@ -62,7 +72,10 @@ public class Scheduler {
             Random rng = new Random();
             for (int slice = 0; slice < RESTART_MAX_SLICES; slice++) {
                 z3.push();
-                encoder.assertCoreSymmetryInto(z3, randomPermutation(spec.processors(), rng));
+                int[] sigma = (greedyFirst && slice == 0)
+                        ? CorePermutation.fromGreedySchedule(spec)
+                        : randomPermutation(spec.processors(), rng);
+                encoder.assertCoreSymmetryInto(z3, sigma);
 
                 Status status = z3.check();
                 if (status == Status.SATISFIABLE) {
@@ -78,9 +91,9 @@ public class Scheduler {
     }
 
     /**
-     * Text path: add quantifiers, ground it, parse it back into z3.
-     * Or... hand quantifiers into z3 without groudning htem
-     * Or... use the XMTLib grounder 
+     * Text path: emit quantified SMT-LIB, ground it, parse it back into z3.
+     * Pass NoGround to hand the quantifiers straight to z3 (its own E-matching);
+     * pass RustGrounder to have xmt-lib expand them first.
      */
     public Result solveText(Spec spec, boolean symmetryBreaking, Grounder grounder) {
         TextEncoder encoder = new TextEncoder(spec, symmetryBreaking);
@@ -126,44 +139,6 @@ public class Scheduler {
                     : new LateResult(false, List.of());
         }
     }
-
-
-    public Result solveWithHybridRestarts(Spec spec) {
-        try (Context ctx = new Context()) {
-            Encoder encoder = new Encoder(ctx, spec, false);
-            Solver z3 = ctx.mkSolver();
-
-            Params sliceParams = ctx.mkParams();
-            sliceParams.add("timeout", RESTART_SLICE_MS);
-            z3.setParameters(sliceParams);
-
-            encoder.assertBaseInto(z3);
-
-            Random rng = new Random();
-            for(int slice = 0; slice < RESTART_MAX_SLICES; slice++) {
-                z3.push();
-                int[] sigma;
-                if (slice == 0) {
-                    sigma = encoder.derivePermutationFromGreedy();
-                } else {
-                    sigma = randomPermutation(spec.processors(), rng);
-                }
-                encoder.assertCoreSymmetryInto(z3, sigma);
-
-                Status status = z3.check();
-                if(status == Status.SATISFIABLE) {
-                    return new Result(Outcome.SCHEDULABLE, encoder.decode(z3.getModel()));
-                }
-                if(status == Status.UNSATISFIABLE) {
-                    return Result.unsolved(Outcome.UNSCHEDULABLE);
-                }
-                z3.pop();
-            }
-            return Result.unsolved(Outcome.TIMEOUT);
-        }
-    }
-
-
 
 
     private Solver newSolver(Context ctx) {

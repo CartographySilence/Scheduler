@@ -4,6 +4,7 @@ import com.microsoft.z3.*;
 import smtsched.encode.Encoder;
 import smtsched.encode.XmtEncoder;
 import smtsched.ground.Grounder;
+import smtsched.schedule.Scheduler;
 import smtsched.spec.Spec;
 
 /**
@@ -21,10 +22,9 @@ public final class Benchmark {
      * @param spec the task set and core count
      * @param symmetry whether to apply symmetry-breaking
      * @param source Label identifying where this spec came from (for CSV purposes only)
-     * @param density The chance that any earlier task becomes this tasks dependency
-     * @param seed Seed used to generate sped
+     * @param density The chance that any earlier task becomes this task's dependency
+     * @param seed Seed used to generate the spec
      * @param timeoutMs Z3 solver timeout in milliseconds
-     * @return
      */
     public static BenchResult run(Spec spec, boolean symmetry, String source, double density, long seed, int timeoutMs) {
         try (Context ctx = new Context()) {
@@ -66,5 +66,23 @@ public final class Benchmark {
 
             return new BenchResult(source, "grounded", spec.tasks().size(), spec.processors(), density, seed, symmetry, status.toString(), ms, assertions);
         }
+    }
+
+    /** Greedy-permutation slice 0, random restarts after — always uses symmetry breaking, so no symmetry param. */
+    public static BenchResult runHybridRestarts(Spec spec, String source, double density, long seed) {
+        Scheduler scheduler = new Scheduler();
+
+        long t0 = System.nanoTime();
+        Scheduler.Result result = scheduler.solveWithHybridRestarts(spec);
+        long ms = (System.nanoTime() - t0) / 1000000;
+
+        String status = switch (result.outcome()) {
+            case SCHEDULABLE -> "SATISFIABLE";
+            case UNSCHEDULABLE -> "UNSATISFIABLE";
+            case TIMEOUT -> "UNKNOWN";
+        };
+
+        // assertions not tracked here — Scheduler.Result doesn't expose the solver
+        return new BenchResult(source, "restart-hybrid", spec.tasks().size(), spec.processors(), density, seed, true, status, ms, -1);
     }
 }

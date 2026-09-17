@@ -32,6 +32,7 @@ public final class BenchRunner {
             results.add(Benchmark.run(spec, true,  "gen", d, seed, TIMEOUT_MS));
             results.add(Benchmark.runGrounded(spec, false, "gen", d, seed, TIMEOUT_MS, xmt));
             results.add(Benchmark.runGrounded(spec, true,  "gen", d, seed, TIMEOUT_MS, xmt));
+            results.add(Benchmark.runHybridRestarts(spec, "gen", d, seed));
         }
         results.addAll(runSpecFolder(xmt));
 
@@ -51,6 +52,7 @@ public final class BenchRunner {
                 out.add(Benchmark.run(spec, true,  name, -1, -1, TIMEOUT_MS));
                 out.add(Benchmark.runGrounded(spec, false, name, -1, -1, TIMEOUT_MS, xmt));
                 out.add(Benchmark.runGrounded(spec, true,  name, -1, -1, TIMEOUT_MS, xmt));
+                out.add(Benchmark.runHybridRestarts(spec, name, -1, -1));
             }
         }
         return out;
@@ -65,16 +67,17 @@ public final class BenchRunner {
         System.out.println("wrote " + results.size() + " rows -> " + OUT_CSV.toAbsolutePath());
     }
 
-    /** Each spec now produces 4 consecutive rows: hand-ground(off,on), grounded(off,on). */
+    /** Each spec now produces 5 consecutive rows: hand-ground(off,on), grounded(off,on), restart-hybrid. */
     private static void summarise(List<BenchResult> results) {
-        System.out.printf("%n%-6s %-6s %-6s %-8s %12s %12s %12s %12s %10s%n",
-                "src", "n", "cores", "density", "hg-off(ms)", "hg-on(ms)", "gr-off(ms)", "gr-on(ms)", "status");
-        for (int i = 0; i + 3 < results.size(); i += 4) {
+        System.out.printf("%n%-6s %-6s %-6s %-8s %12s %12s %12s %12s %12s %10s%n",
+                "src", "n", "cores", "density", "hg-off(ms)", "hg-on(ms)", "gr-off(ms)", "gr-on(ms)", "restart(ms)", "status");
+        for (int i = 0; i + 4 < results.size(); i += 5) {
             BenchResult hgOff = results.get(i), hgOn = results.get(i + 1);
             BenchResult grOff = results.get(i + 2), grOn = results.get(i + 3);
-            System.out.printf("%-6s %-6d %-6d %-8.2f %12d %12d %12d %12d %10s%n",
+            BenchResult restart = results.get(i + 4);
+            System.out.printf("%-6s %-6d %-6d %-8.2f %12d %12d %12d %12d %12d %10s%n",
                     hgOff.source(), hgOff.nTasks(), hgOff.cores(), hgOff.density(),
-                    hgOff.solveMs(), hgOn.solveMs(), grOff.solveMs(), grOn.solveMs(), hgOff.status());
+                    hgOff.solveMs(), hgOn.solveMs(), grOff.solveMs(), grOn.solveMs(), restart.solveMs(), hgOff.status());
         }
     }
 }

@@ -43,11 +43,8 @@ public class Encoder {
 
 
     /**
-     * Decalres one {@code start}/{@code proc} integer variable per task and caches 
-     * each tasks duration for reuse in constraint building and decoding
-     * @param ctx
-     * @param spec
-     * @param isSymmetryBreaking
+     * Declares one {@code start}/{@code proc} integer variable per task and caches
+     * each task's duration for reuse in constraint building and decoding.
      */
     public Encoder(Context ctx, Spec spec, boolean isSymmetryBreaking) {
         this.ctx = ctx;
@@ -63,12 +60,13 @@ public class Encoder {
 
 
 
-    /** Hard-deadline satisfiability. */
-        public void assertBaseInto(Solver solver) {
+    /** Core + deadline constraints only, no symmetry breaking — used by the restart loops in Scheduler. */
+    public void assertBaseInto(Solver solver) {
         addCore(solver::add);
         addHardDeadlines(solver::add);
     }
 
+    /** Symmetry breaking alone, under an explicit permutation — used by the restart loops in Scheduler. */
     public void assertCoreSymmetryInto(Solver solver, int[] sigma) {
         addCoreSymmetry(solver::add, sigma);
     }
@@ -76,7 +74,7 @@ public class Encoder {
     /** Hard-deadline satisfiability. */
     public void assertInto(Solver solver) {
         assertBaseInto(solver);
-        if (isSymmetryBreaking) assertCoreSymmetryInto(solver, derivePermutationFromGreedy());
+        if (isSymmetryBreaking) assertCoreSymmetryInto(solver, CorePermutation.fromGreedySchedule(spec));
     }
 
     /** Soft-deadline lateness minimisation. */
@@ -144,7 +142,7 @@ public class Encoder {
     }
 
     private void addSymmetry(Consumer<BoolExpr> add) {
-        addCoreSymmetry(add, derivePermutationFromGreedy());
+        addCoreSymmetry(add, CorePermutation.fromGreedySchedule(spec));
     }
 
     private void addCoreSymmetry(Consumer<BoolExpr> add, int[] sigma) {
@@ -176,104 +174,6 @@ public class Encoder {
 
         add.accept(ctx.mkEq(canon, chain));
         return canon;
-    }
-
-
-    /**
-     * Approach 1: derive a permutation from a greedy list, so the canonical label has a higher chance of lining up with Z3's own search
-     * and what it is likely to find, instead of forcing task-index order
-    */
-    
-    public int[] derivePermutationFromGreedy() {
-        int n = spec.processors();
-        Map<String, Integer> greedyCore = greedySchedule();
-
-        int[] sigma = new int[n];
-        Arrays.fill(sigma, -1);
-        boolean[] used = new boolean[n];
-        int nextLabel = 0;
-
-        for(Spec.TaskDef t : spec.tasks()) {
-            int c = greedyCore.get(t.id());
-            if(!used[c]) {
-                used[c] = true;
-                sigma[c] = nextLabel++;
-            }
-        }
-
-        for(int c = 0; c < n; c++) {
-            if (sigma[c] == -1) {
-                sigma[c] = nextLabel++;
-            }
-        }
-        return sigma;
-    }
-
-
-    private Map<String, Integer> greedySchedule() {
-        List<Spec.TaskDef> topo = topologicalOrder();
-        int n = spec.processors();
-        long[] coreFree = new long[n];
-        Map<String, Long> finish = new HashMap<>();
-        Map<String, Integer> core = new HashMap<>();
-
-        for(Spec.TaskDef t : topo) {
-            long earliestStart = 0;
-
-            for (String dep : t.after()) {
-                earliestStart = Math.max(earliestStart, finish.get(dep));
-            }
-
-            int bestCore = 0;
-            long bestStart = Math.max(earliestStart, coreFree[0]);
-            for (int c = 1; c < n; c++) {
-                long s = Math.max(earliestStart, coreFree[c]);
-
-                if (s < bestStart) { 
-                    bestStart = s; bestCore = c; 
-                }
-            }
-
-            long f = bestStart + t.duration();
-            coreFree[bestCore] = f;
-            finish.put(t.id(), f);
-            core.put(t.id(), bestCore);
-        }
-
-        return core;
-    }
-
-
-    /** Khan's algorithm */
-    private List<Spec.TaskDef> topologicalOrder() {
-        Map<String, Spec.TaskDef> byId = new LinkedHashMap<>();
-        Map<String, Integer> indegree = new HashMap<>();
-        Map<String, List<String>> dependents = new HashMap<>();
-
-        for(Spec.TaskDef t : spec.tasks()) {
-            byId.put(t.id(), t);
-            indegree.put(t.id(), t.after().size());
-            for (String dep : t.after()) dependents.computeIfAbsent(dep, k -> new ArrayList<>()).add(t.id());
-        }
-
-        Deque<String> ready = new ArrayDeque<>();
-        for (Spec.TaskDef t : spec.tasks()) {
-            if (indegree.get(t.id()) == 0) {
-                ready.add(t.id());
-            }
-        }
-
-        List<Spec.TaskDef> order = new ArrayList<>();
-        while(!ready.isEmpty()) {
-            String id = ready.poll();
-            order.add(byId.get(id));
-            for(String dep : dependents.getOrDefault(id, List.of())) {
-                if(indegree.merge(dep, -1, Integer::sum) == 0) {
-                    ready.add(dep);
-                }
-            }
-        }
-        return order;
     }
 
 
