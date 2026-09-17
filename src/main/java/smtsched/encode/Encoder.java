@@ -184,7 +184,7 @@ public class Encoder {
      * and what it is likely to find, instead of forcing task-index order
     */
     
-    private int[] derivePermutationFromGreedy() {
+    public int[] derivePermutationFromGreedy() {
         int n = spec.processors();
         Map<String, Integer> greedyCore = greedySchedule();
 
