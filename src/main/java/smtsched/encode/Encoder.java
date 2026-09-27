@@ -89,9 +89,9 @@ public class Encoder {
         IntNum zero  = ctx.mkInt(0);
         IntNum cores = ctx.mkInt(spec.processors());
 
-        // start >= 0 ; 0 <= proc < N
+        // start >= release ; 0 <= proc < N
         for (Spec.TaskDef t : spec.tasks()) {
-            add.accept(ctx.mkGe(start.get(t.id()), zero));
+            add.accept(ctx.mkGe(start.get(t.id()), ctx.mkInt(t.release())));
             add.accept(ctx.mkGe(proc.get(t.id()), zero));
             add.accept(ctx.mkLt(proc.get(t.id()), cores));
         }

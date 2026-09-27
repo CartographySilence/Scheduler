@@ -28,8 +28,10 @@ public final class BenchRunner {
 
         for (int n : SIZES) for (int c : CORES) for (double d : DENSITY) for (long seed : SEEDS) {
             Spec spec = Generator.random(n, c, d, TIGHTNESS, seed);
-            results.add(Benchmark.run(spec, false, "gen", d, seed, TIMEOUT_MS));
-            results.add(Benchmark.run(spec, true,  "gen", d, seed, TIMEOUT_MS));
+            results.add(Benchmark.runBasic(spec, false, "gen", d, seed, TIMEOUT_MS));
+            results.add(Benchmark.runBasic(spec, true,  "gen", d, seed, TIMEOUT_MS));
+            results.add(Benchmark.runQuantified(spec, false, "gen", d, seed, TIMEOUT_MS));
+            results.add(Benchmark.runQuantified(spec, true,  "gen", d, seed, TIMEOUT_MS));
             results.add(Benchmark.runGrounded(spec, false, "gen", d, seed, TIMEOUT_MS, xmt));
             results.add(Benchmark.runGrounded(spec, true,  "gen", d, seed, TIMEOUT_MS, xmt));
             results.add(Benchmark.runHybridRestarts(spec, "gen", d, seed));
@@ -48,8 +50,10 @@ public final class BenchRunner {
             for (Path f : files.filter(p -> p.toString().endsWith(".json")).sorted().toList()) {
                 Spec spec = parser.parse(Files.readString(f));
                 String name = f.getFileName().toString();
-                out.add(Benchmark.run(spec, false, name, -1, -1, TIMEOUT_MS));
-                out.add(Benchmark.run(spec, true,  name, -1, -1, TIMEOUT_MS));
+                out.add(Benchmark.runBasic(spec, false, name, -1, -1, TIMEOUT_MS));
+                out.add(Benchmark.runBasic(spec, true,  name, -1, -1, TIMEOUT_MS));
+                out.add(Benchmark.runQuantified(spec, false, name, -1, -1, TIMEOUT_MS));
+                out.add(Benchmark.runQuantified(spec, true,  name, -1, -1, TIMEOUT_MS));
                 out.add(Benchmark.runGrounded(spec, false, name, -1, -1, TIMEOUT_MS, xmt));
                 out.add(Benchmark.runGrounded(spec, true,  name, -1, -1, TIMEOUT_MS, xmt));
                 out.add(Benchmark.runHybridRestarts(spec, name, -1, -1));
@@ -67,17 +71,19 @@ public final class BenchRunner {
         System.out.println("wrote " + results.size() + " rows -> " + OUT_CSV.toAbsolutePath());
     }
 
-    /** Each spec now produces 5 consecutive rows: hand-ground(off,on), grounded(off,on), restart-hybrid. */
+    /** Each spec now produces 7 consecutive rows: basic(off,on), quantified(off,on), grounded(off,on), restart-hybrid. */
     private static void summarise(List<BenchResult> results) {
-        System.out.printf("%n%-6s %-6s %-6s %-8s %12s %12s %12s %12s %12s %10s%n",
-                "src", "n", "cores", "density", "hg-off(ms)", "hg-on(ms)", "gr-off(ms)", "gr-on(ms)", "restart(ms)", "status");
-        for (int i = 0; i + 4 < results.size(); i += 5) {
-            BenchResult hgOff = results.get(i), hgOn = results.get(i + 1);
-            BenchResult grOff = results.get(i + 2), grOn = results.get(i + 3);
-            BenchResult restart = results.get(i + 4);
-            System.out.printf("%-6s %-6d %-6d %-8.2f %12d %12d %12d %12d %12d %10s%n",
-                    hgOff.source(), hgOff.nTasks(), hgOff.cores(), hgOff.density(),
-                    hgOff.solveMs(), hgOn.solveMs(), grOff.solveMs(), grOn.solveMs(), restart.solveMs(), hgOff.status());
+        System.out.printf("%n%-6s %-6s %-6s %-8s %9s %9s %9s %9s %9s %9s %9s %10s%n",
+                "src", "n", "cores", "density", "bas-off", "bas-on", "qnt-off", "qnt-on", "grd-off", "grd-on", "restart", "status");
+        for (int i = 0; i + 6 < results.size(); i += 7) {
+            BenchResult basOff = results.get(i),     basOn = results.get(i + 1);
+            BenchResult qntOff = results.get(i + 2), qntOn = results.get(i + 3);
+            BenchResult grdOff = results.get(i + 4), grdOn = results.get(i + 5);
+            BenchResult restart = results.get(i + 6);
+            System.out.printf("%-6s %-6d %-6d %-8.2f %9d %9d %9d %9d %9d %9d %9d %10s%n",
+                    basOff.source(), basOff.nTasks(), basOff.cores(), basOff.density(),
+                    basOff.solveMs(), basOn.solveMs(), qntOff.solveMs(), qntOn.solveMs(),
+                    grdOff.solveMs(), grdOn.solveMs(), restart.solveMs(), basOff.status());
         }
     }
 }

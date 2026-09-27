@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 /**
  * Runs the same spec through each encoding mode and prints a timing table.
  *
- * Modes: hand-ground (object encoder, n^2 loop) vs quantified text handed to z3.
+ * Modes: basic (object encoder, n^2 loop) vs quantified text handed to z3, vs grounded via xmt-lib.
  */
 public final class ModeComparison {
 
@@ -25,7 +25,7 @@ public final class ModeComparison {
         System.out.println("  " + "─".repeat(56));
 
         for (boolean sym : new boolean[]{ false, true })
-            time("hand-ground", sym, () -> scheduler.solve(spec, sym));
+            time("basic", sym, () -> scheduler.solve(spec, sym));
 
         for (boolean sym : new boolean[]{ false, true })
             time("quantified", sym, () -> scheduler.solveText(spec, sym, new NoGround()));

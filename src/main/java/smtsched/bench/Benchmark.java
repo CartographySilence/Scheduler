@@ -2,8 +2,10 @@ package smtsched.bench;
 
 import com.microsoft.z3.*;
 import smtsched.encode.Encoder;
+import smtsched.encode.TextEncoder;
 import smtsched.encode.XmtEncoder;
 import smtsched.ground.Grounder;
+import smtsched.ground.NoGround;
 import smtsched.schedule.Scheduler;
 import smtsched.spec.Spec;
 
@@ -26,7 +28,7 @@ public final class Benchmark {
      * @param seed Seed used to generate the spec
      * @param timeoutMs Z3 solver timeout in milliseconds
      */
-    public static BenchResult run(Spec spec, boolean symmetry, String source, double density, long seed, int timeoutMs) {
+    public static BenchResult runBasic(Spec spec, boolean symmetry, String source, double density, long seed, int timeoutMs) {
         try (Context ctx = new Context()) {
             Solver z3 = ctx.mkSolver();
 
@@ -42,7 +44,30 @@ public final class Benchmark {
             Status status = z3.check();
             long ms = (System.nanoTime() - t0) / 1000000;
 
-            return new BenchResult(source, "hand-ground", spec.tasks().size(), spec.processors(), density, seed, symmetry, status.toString(), ms, assertions);
+            return new BenchResult(source, "basic", spec.tasks().size(), spec.processors(), density, seed, symmetry, status.toString(), ms, assertions);
+        }
+    }
+
+    /** Quantified text handed straight to z3 — its own E-matching, no grounding step at all. */
+    public static BenchResult runQuantified(Spec spec, boolean symmetry, String source, double density, long seed, int timeoutMs) {
+        TextEncoder encoder = new TextEncoder(spec, symmetry);
+        String text = new NoGround().ground(encoder.encode());
+
+        try (Context ctx = new Context()) {
+            Solver z3 = ctx.mkSolver();
+
+            Params p = ctx.mkParams();
+            p.add("timeout", timeoutMs);
+            z3.setParameters(p);
+
+            z3.add(ctx.parseSMTLIB2String(text, null, null, null, null));
+
+            int assertions = z3.getAssertions().length;
+            long t0 = System.nanoTime();
+            Status status = z3.check();
+            long ms = (System.nanoTime() - t0) / 1000000;
+
+            return new BenchResult(source, "quantified", spec.tasks().size(), spec.processors(), density, seed, symmetry, status.toString(), ms, assertions);
         }
     }
 

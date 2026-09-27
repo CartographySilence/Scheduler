@@ -43,6 +43,7 @@ public class XmtEncoder {
 
         s.append("(declare-fun dur (Int) Int)\n");
         s.append("(declare-fun dl (Int) Int)\n");
+        s.append("(declare-fun rel (Int) Int)\n");
         for (int i = 0; i < n; i++) {
             Spec.TaskDef t = spec.tasks().get(i);
             s.append("(assert (= (dur ")
@@ -54,6 +55,11 @@ public class XmtEncoder {
             s.append("(assert (= (dl ")
              .append(i).append(") ")
              .append(t.deadline())
+             .append("))\n");
+
+            s.append("(assert (= (rel ")
+             .append(i).append(") ")
+             .append(t.release())
              .append("))\n");
         }
         s.append('\n');
@@ -73,7 +79,7 @@ public class XmtEncoder {
 
         s.append("(assert (forall ((i Int))\n");
         s.append("(=> (Task i)\n");
-        s.append("(and (>= (start i) 0)\n");
+        s.append("(and (>= (start i) (rel i))\n");
         s.append("(<= (+ (start i) (dur i)) (dl i))\n");
         s.append("(>= (proc i) 0)\n");
         s.append("(< (proc i) ").append(cores).append(")))))\n\n");

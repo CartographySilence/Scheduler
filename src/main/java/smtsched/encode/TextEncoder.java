@@ -48,11 +48,12 @@ public class TextEncoder {
         s.append("(declare-fun proc (Int) Int)\n\n");
 
 
-        // Task Data 
+        // Task Data
         s.append("(declare-fun dur (Int) Int)\n");
         s.append("(declare-fun dl (Int) Int)\n");
+        s.append("(declare-fun rel (Int) Int)\n");
 
-        // Data itself, duration and dealine per task
+        // Data itself, duration, deadline and release per task
         for (int i = 0; i < n; i++) {
             Spec.TaskDef t = spec.tasks().get(i);
             s.append("(assert (= (dur ")
@@ -66,13 +67,19 @@ public class TextEncoder {
             append(") ").
             append(t.deadline()).
             append("))\n");
-        } 
+
+            s.append("(assert (= (rel ").
+            append(i).
+            append(") ").
+            append(t.release()).
+            append("))\n");
+        }
         s.append('\n');
 
 
         s.append("(assert (forall ((i Int))\n");
         s.append("(=> (and (<= 0 i) (< i ").append(n).append("))\n");
-        s.append("(and (>= (start i) 0)\n");
+        s.append("(and (>= (start i) (rel i))\n");
         s.append("(<= (+ (start i) (dur i)) (dl i))\n");
         s.append("(>= (proc i) 0)\n");
         s.append("(< (proc i) ").append(cores).append(")))))\n\n");

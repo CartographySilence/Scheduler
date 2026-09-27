@@ -48,9 +48,11 @@ public class SpecParser {
             if (t.deadline == null) throw new SpecException(t.id + ": missing 'deadline'");
             if (t.duration <= 0) throw new SpecException(t.id + ": 'duration' must be > 0");
             if (t.deadline <= 0) throw new SpecException(t.id + ": 'deadline' must be > 0");
-            if (t.duration > t.deadline)
-                throw new SpecException(t.id + ": infeasible, duration " + t.duration + " > deadline " + t.deadline);
-            tasks.add(new Spec.TaskDef(t.id, t.duration, t.deadline,
+            long release = t.release == null ? 0 : t.release;
+            if (release < 0) throw new SpecException(t.id + ": 'release' must be >= 0");
+            if (release + t.duration > t.deadline)
+                throw new SpecException(t.id + ": infeasible, release " + release + " + duration " + t.duration + " > deadline " + t.deadline);
+            tasks.add(new Spec.TaskDef(t.id, t.duration, t.deadline, release,
                     t.after == null ? List.of() : t.after));
         }
 
@@ -67,7 +69,7 @@ public class SpecParser {
         return new SpecException("malformed JSON: " + e.getOriginalMessage(), e);
     }
     private static final class RawSpec { public Integer processors; public List<RawTask> tasks; }
-    private static final class RawTask { public String id; public Long duration; public Long deadline; public List<String> after; }
+    private static final class RawTask { public String id; public Long duration; public Long deadline; public Long release; public List<String> after; }
     
 }
 

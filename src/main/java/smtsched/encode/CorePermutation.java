@@ -47,7 +47,7 @@ public final class CorePermutation {
         Map<String, Integer> core = new HashMap<>();
 
         for (Spec.TaskDef t : topo) {
-            long earliestStart = 0;
+            long earliestStart = t.release();
 
             for (String dep : t.after()) {
                 earliestStart = Math.max(earliestStart, finish.get(dep));
