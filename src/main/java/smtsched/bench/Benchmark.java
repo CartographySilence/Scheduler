@@ -2,6 +2,7 @@ package smtsched.bench;
 
 import com.microsoft.z3.*;
 import smtsched.encode.Encoder;
+import smtsched.encode.Symmetry;
 import smtsched.encode.TextEncoder;
 import smtsched.encode.XmtEncoder;
 import smtsched.ground.Grounder;
@@ -28,7 +29,8 @@ public final class Benchmark {
      * @param seed Seed used to generate the spec
      * @param timeoutMs Z3 solver timeout in milliseconds
      */
-    public static BenchResult runBasic(Spec spec, boolean symmetry, String source, double density, long seed, int timeoutMs) {
+    public static BenchResult runExplicit(Spec spec, Symmetry symmetry, String source, double density, double tightness, long maxRelease, double utilisation, long seed, int timeoutMs) {
+        long total0 = System.nanoTime();
         try (Context ctx = new Context()) {
             Solver z3 = ctx.mkSolver();
 
@@ -43,13 +45,15 @@ public final class Benchmark {
             long t0 = System.nanoTime();
             Status status = z3.check();
             long ms = (System.nanoTime() - t0) / 1000000;
+            long totalMs = (System.nanoTime() - total0) / 1000000;
 
-            return new BenchResult(source, "basic", spec.tasks().size(), spec.processors(), density, seed, symmetry, status.toString(), ms, assertions);
+            return new BenchResult(source, "explicit", spec.tasks().size(), spec.processors(), density, tightness, maxRelease, utilisation, seed, symmetry, status.toString(), ms, totalMs, assertions);
         }
     }
 
     /** Quantified text handed straight to z3 — its own E-matching, no grounding step at all. */
-    public static BenchResult runQuantified(Spec spec, boolean symmetry, String source, double density, long seed, int timeoutMs) {
+    public static BenchResult runQuantified(Spec spec, Symmetry symmetry, String source, double density, double tightness, long maxRelease, double utilisation, long seed, int timeoutMs) {
+        long total0 = System.nanoTime();
         TextEncoder encoder = new TextEncoder(spec, symmetry);
         String text = new NoGround().ground(encoder.encode());
 
@@ -66,14 +70,16 @@ public final class Benchmark {
             long t0 = System.nanoTime();
             Status status = z3.check();
             long ms = (System.nanoTime() - t0) / 1000000;
+            long totalMs = (System.nanoTime() - total0) / 1000000;
 
-            return new BenchResult(source, "quantified", spec.tasks().size(), spec.processors(), density, seed, symmetry, status.toString(), ms, assertions);
+            return new BenchResult(source, "quantified", spec.tasks().size(), spec.processors(), density, tightness, maxRelease, utilisation, seed, symmetry, status.toString(), ms, totalMs, assertions);
         }
     }
 
-    public static BenchResult runGrounded(Spec spec, boolean symmetry, String source, double density, long seed, int timeoutMs, Grounder grounder) {
+    public static BenchResult runGrounded(Spec spec, Symmetry symmetry, String source, double density, double tightness, long maxRelease, double utilisation, long seed, int timeoutMs, Grounder grounder) {
+        long total0 = System.nanoTime();
         XmtEncoder encoder = new XmtEncoder(spec, symmetry);
-        String grounded = grounder.ground(encoder.encode());
+        String grounded = Scheduler.stripUnusedDeclarations(grounder.ground(encoder.encode()));
 
         try (Context ctx = new Context()) {
             Solver z3 = ctx.mkSolver();
@@ -88,18 +94,20 @@ public final class Benchmark {
             long t0 = System.nanoTime();
             Status status = z3.check();
             long ms = (System.nanoTime() - t0) / 1000000;
+            long totalMs = (System.nanoTime() - total0) / 1000000;
 
-            return new BenchResult(source, "grounded", spec.tasks().size(), spec.processors(), density, seed, symmetry, status.toString(), ms, assertions);
+            return new BenchResult(source, "grounded", spec.tasks().size(), spec.processors(), density, tightness, maxRelease, utilisation, seed, symmetry, status.toString(), ms, totalMs, assertions);
         }
     }
 
-    /** Greedy-permutation slice 0, random restarts after — always uses symmetry breaking, so no symmetry param. */
-    public static BenchResult runHybridRestarts(Spec spec, String source, double density, long seed) {
+    public static BenchResult runRestarts(Spec spec, String source, double density, double tightness, long maxRelease, double utilisation, long seed) {
+        long total0 = System.nanoTime();
         Scheduler scheduler = new Scheduler();
 
         long t0 = System.nanoTime();
-        Scheduler.Result result = scheduler.solveWithHybridRestarts(spec);
+        Scheduler.Result result = scheduler.solveWithRestarts(spec);
         long ms = (System.nanoTime() - t0) / 1000000;
+        long totalMs = (System.nanoTime() - total0) / 1000000;
 
         String status = switch (result.outcome()) {
             case SCHEDULABLE -> "SATISFIABLE";
@@ -107,7 +115,6 @@ public final class Benchmark {
             case TIMEOUT -> "UNKNOWN";
         };
 
-        // assertions not tracked here — Scheduler.Result doesn't expose the solver
-        return new BenchResult(source, "restart-hybrid", spec.tasks().size(), spec.processors(), density, seed, true, status, ms, -1);
+        return new BenchResult(source, "restart", spec.tasks().size(), spec.processors(), density, tightness, maxRelease, utilisation, seed, Symmetry.UNPERMUTED, status, ms, totalMs, -1);
     }
 }

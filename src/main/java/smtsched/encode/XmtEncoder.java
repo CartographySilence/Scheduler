@@ -8,11 +8,11 @@ public class XmtEncoder {
     private final Spec spec;
     private final List<String> names = new ArrayList<>();
     private final Map<String, Integer> index = new HashMap<>();
-    private final boolean symmetryBreaking;
+    private final Symmetry symmetry;
 
-    public XmtEncoder(Spec spec, boolean symmetryBreaking) {
+    public XmtEncoder(Spec spec, Symmetry symmetry) {
         this.spec = spec;
-        this.symmetryBreaking = symmetryBreaking;
+        this.symmetry = symmetry;
         for(Spec.TaskDef t : spec.tasks()) {
             index.put(t.id(), names.size());
             names.add(t.id());
@@ -103,7 +103,7 @@ public class XmtEncoder {
             s.append('\n');
         }
 
-        if (symmetryBreaking) {
+        if (symmetry != Symmetry.NONE) {
             s.append(symmetryBreak(n));
         }
 
@@ -113,33 +113,19 @@ public class XmtEncoder {
 
 
     private String symmetryBreak(int n) {
-        int[] sigma = CorePermutation.fromGreedySchedule(spec);
+        int[] order = symmetry == Symmetry.GREEDY ? CorePermutation.fromGreedySchedule(spec) : CorePermutation.unpermuted(spec);
         StringBuilder s = new StringBuilder();
 
-        s.append("(declare-fun canon (Int) Int)\n");
-        for (int i = 0; i < n; i++) {
-            s.append("(assert (= (canon ").append(i).append(") ").append(canonIte(i, sigma)).append("))\n");
-        }
-        s.append('\n');
-
         s.append("(declare-fun maxUsed (Int) Int)\n");
-        s.append("(assert (= (canon 0) 0))\n");
+        s.append("(assert (= (proc ").append(order[0]).append(") 0))\n");
         s.append("(assert (= (maxUsed 0) 0))\n");
         for (int i = 1; i < n; i++) {
-            s.append("(assert (<= (canon ").append(i).append(") (+ (maxUsed ").append(i - 1).append(") 1)))\n");
-            s.append("(assert (= (maxUsed ").append(i).append(") (ite (> (canon ").append(i)
-             .append(") (maxUsed ").append(i - 1).append(")) (canon ").append(i)
+            s.append("(assert (<= (proc ").append(order[i]).append(") (+ (maxUsed ").append(i - 1).append(") 1)))\n");
+            s.append("(assert (= (maxUsed ").append(i).append(") (ite (> (proc ").append(order[i])
+             .append(") (maxUsed ").append(i - 1).append(")) (proc ").append(order[i])
              .append(") (maxUsed ").append(i - 1).append("))))\n");
         }
         return s.append('\n').toString();
-    }
-
-    private static String canonIte(int taskIndex, int[] sigma) {
-        String chain = String.valueOf(sigma[sigma.length - 1]);
-        for (int k = sigma.length - 2; k >= 0; k--) {
-            chain = "(ite (= (proc " + taskIndex + ") " + k + ") " + sigma[k] + " " + chain + ")";
-        }
-        return chain;
     }
 
 }

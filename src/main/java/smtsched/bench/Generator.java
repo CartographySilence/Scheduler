@@ -10,6 +10,8 @@ import java.util.*;
 public final class Generator {
     private Generator() {}
 
+    public record Instance(Spec spec, double utilisation) {}
+
     /**
      * Builds a random task set with a DAG precdence structure and deadlines dervied from each task's own earliest finish time
      *
@@ -29,11 +31,11 @@ public final class Generator {
      * @return
      */
     public static Spec random(int nTasks, int cores, double density, double tightness, long seed) {
-        return random(nTasks, cores, density, tightness, seed, 0);
+        return random(nTasks, cores, density, tightness, seed, 0).spec();
     }
 
     /** Same as {@link #random(int, int, double, double, long)}, but each task also gets a random release time in {@code [0, maxRelease]}. */
-    public static Spec random(int nTasks, int cores, double density, double tightness, long seed, long maxRelease) {
+    public static Instance random(int nTasks, int cores, double density, double tightness, long seed, long maxRelease) {
         Random rng = new Random(seed);
 
         long[] dur = new long[nTasks];
@@ -69,11 +71,19 @@ public final class Generator {
             earliestFinish[j] = start + dur[j];
         }
 
+        long criticalPath = 0;
+        long totalWork = 0;
+        for (int j = 0; j < nTasks; j++) {
+            criticalPath = Math.max(criticalPath, earliestFinish[j]);
+            totalWork += dur[j];
+        }
+        long horizon = (long) Math.ceil(tightness * Math.max(criticalPath, (double) totalWork / cores) - 1e-9);
+
         List<Spec.TaskDef> tasks = new ArrayList<>();
         for (int j = 0; j < nTasks; j++) {
-            long deadline = Math.max(dur[j], Math.round(earliestFinish[j] * tightness));
+            long deadline = Math.max(dur[j], horizon);
             tasks.add(new Spec.TaskDef("T" + j, dur[j], deadline, release[j], after.get(j)));
         }
-        return new Spec(cores, tasks);
+        return new Instance(new Spec(cores, tasks), (double) totalWork / (cores * horizon));
     }
 }

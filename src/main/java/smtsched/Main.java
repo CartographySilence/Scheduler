@@ -7,6 +7,7 @@ import smtsched.spec.SpecParser;
 import smtsched.schedule.Scheduler;
 import smtsched.encode.Encoder;
 import smtsched.encode.Encoder.LateAssignment;
+import smtsched.encode.Symmetry;
 import smtsched.ground.NoGround;
 import smtsched.ground.RustGrounder;
 
@@ -20,7 +21,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Interactive CLI: load a spec, pick a solve mode, see the schedule, loop.
+ *
  */
 public class Main {
 
@@ -134,9 +135,17 @@ public class Main {
         report(in, scheduler, spec, result);
     }
 
-    private static boolean askSymmetry(Scanner in) {
-        System.out.print("symmetry breaking? [y/n]: ");
-        return in.nextLine().trim().equalsIgnoreCase("y");
+    private static Symmetry askSymmetry(Scanner in) {
+        System.out.println("  symmetry breaking:");
+        System.out.println("  1  none");
+        System.out.println("  2  unpermuted");
+        System.out.println("  3  greedy");
+        System.out.print("> ");
+        return switch (in.nextLine().trim()) {
+            case "2" -> Symmetry.UNPERMUTED;
+            case "3" -> Symmetry.GREEDY;
+            default -> Symmetry.NONE;
+        };
     }
 
     private static void report(Scanner in, Scheduler scheduler, Spec spec, Scheduler.Result result) {

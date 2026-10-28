@@ -1,89 +1,110 @@
 package smtsched.bench;
 
-import smtsched.ground.Grounder;
-import smtsched.ground.RustGrounder;
-import smtsched.spec.Spec;
-import smtsched.spec.SpecParser;
+import smtsched.encode.Symmetry;
+import smtsched.schedule.Scheduler;
 
-import java.io.IOException;
+import java.io.BufferedWriter;
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Stream;
+import java.util.concurrent.*;
 
 public final class BenchRunner {
 
-    private static final int[] SIZES = { 10, 20, 40, 80 };
-    private static final int[] CORES = { 2, 4, 8 };
-    private static final double[] DENSITY = { 0.1, 0.3 };
-    private static final double TIGHTNESS = 1.4;
-    private static final long[] SEEDS = { 1, 2, 3 };
-    private static final int TIMEOUT_MS = 60000;
-    private static final Path SPEC_DIR = Path.of("bench", "specs");
-    private static final Path OUT_CSV  = Path.of("bench", "results.csv");
-    private static final Path GROUNDER_BIN = Path.of("rust-grounder", "target", "release", "rust-grounder");
+    private static final int[] A_LOADS = { 10, 20, 30 };
+    private static final int[] A_CORES = { 2, 4, 6 };
+    private static final double A_TIGHTNESS = 1.4;
 
-    public static void main(String[] args) throws IOException {
-        Grounder xmt = new RustGrounder(GROUNDER_BIN);
-        List<BenchResult> results = new ArrayList<>();
+    private static final int B_TASKS = 20;
+    private static final int B_CORES = 2;
+    private static final int B_STEPS = 8;
 
-        for (int n : SIZES) for (int c : CORES) for (double d : DENSITY) for (long seed : SEEDS) {
-            Spec spec = Generator.random(n, c, d, TIGHTNESS, seed);
-            results.add(Benchmark.runBasic(spec, false, "gen", d, seed, TIMEOUT_MS));
-            results.add(Benchmark.runBasic(spec, true,  "gen", d, seed, TIMEOUT_MS));
-            results.add(Benchmark.runQuantified(spec, false, "gen", d, seed, TIMEOUT_MS));
-            results.add(Benchmark.runQuantified(spec, true,  "gen", d, seed, TIMEOUT_MS));
-            results.add(Benchmark.runGrounded(spec, false, "gen", d, seed, TIMEOUT_MS, xmt));
-            results.add(Benchmark.runGrounded(spec, true,  "gen", d, seed, TIMEOUT_MS, xmt));
-            results.add(Benchmark.runHybridRestarts(spec, "gen", d, seed));
+    private static final int[] C_TASKS = { 40, 60, 80 };
+    private static final int C_CORES = 2;
+    private static final double C_TIGHTNESS = 1.35;
+
+    private static final int X_TASKS = 120;
+    private static final int X_CORES = 12;
+    private static final int X_SEEDS = 30;
+
+    private static final double DENSITY = 0.3;
+    private static final long[] SEEDS = { 1, 2, 3, 4, 5 };
+    private static final long[] EXTENDED_SEEDS = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+    private static final long MAX_RELEASE = 10;
+    private static final int WORKERS = 4;
+
+    private static final Path OUT_CSV  = Path.of("bench", "results-60s.csv");
+
+    private static final int ARMS = 4;
+
+    public static void main(String[] args) throws Exception {
+        runAll("warmup", 10, 2, A_TIGHTNESS, 0);
+
+        ExecutorService pool = Executors.newFixedThreadPool(WORKERS);
+        List<Future<List<BenchResult>>> futures = new ArrayList<>();
+        for (int load : A_LOADS) for (int c : A_CORES) {
+            int n = load * c;
+            if (n == 120 || n == 180) continue;
+            long[] seeds = (n == 40 && c == 4) || (n == 60 && c == 6) ? EXTENDED_SEEDS : SEEDS;
+            for (long seed : seeds)
+                futures.add(pool.submit(() -> runAll("A", n, c, A_TIGHTNESS, seed)));
         }
-        results.addAll(runSpecFolder(xmt));
+        for (long seed = 1; seed <= X_SEEDS; seed++) {
+            long s = seed;
+            futures.add(pool.submit(() -> runAll("A", X_TASKS, X_CORES, A_TIGHTNESS, s)));
+        }
+        for (int step = 0; step <= B_STEPS; step++) for (long seed : SEEDS) {
+            double tightness = (1000 + 25 * step) / 1000.0;
+            futures.add(pool.submit(() -> runAll("B", B_TASKS, B_CORES, tightness, seed)));
+        }
+        for (int n : C_TASKS) for (long seed : SEEDS)
+            futures.add(pool.submit(() -> runAll("C", n, C_CORES, C_TIGHTNESS, seed)));
 
-        write(results);
+        List<BenchResult> results = new ArrayList<>();
+        Files.createDirectories(OUT_CSV.getParent());
+        try (BufferedWriter out = Files.newBufferedWriter(OUT_CSV)) {
+            out.write(BenchResult.csvHeader());
+            out.newLine();
+            out.flush();
+
+            for (Future<List<BenchResult>> f : futures) {
+                List<BenchResult> rows = f.get();
+                for (BenchResult r : rows) {
+                    out.write(r.toCsv());
+                    out.newLine();
+                }
+                out.flush();
+                results.addAll(rows);
+            }
+        } finally {
+            pool.shutdown();
+        }
+
+        System.out.println("wrote " + results.size() + " rows -> " + OUT_CSV.toAbsolutePath());
         summarise(results);
     }
 
-    private static List<BenchResult> runSpecFolder(Grounder xmt) throws IOException {
+    private static List<BenchResult> runAll(String source, int nTasks, int cores, double tightness, long seed) {
+        Generator.Instance inst = Generator.random(nTasks, cores, DENSITY, tightness, seed, MAX_RELEASE);
+        double u = inst.utilisation();
+
         List<BenchResult> out = new ArrayList<>();
-        if (!Files.isDirectory(SPEC_DIR)) return out;
-        SpecParser parser = new SpecParser();
-        try (Stream<Path> files = Files.list(SPEC_DIR)) {
-            for (Path f : files.filter(p -> p.toString().endsWith(".json")).sorted().toList()) {
-                Spec spec = parser.parse(Files.readString(f));
-                String name = f.getFileName().toString();
-                out.add(Benchmark.runBasic(spec, false, name, -1, -1, TIMEOUT_MS));
-                out.add(Benchmark.runBasic(spec, true,  name, -1, -1, TIMEOUT_MS));
-                out.add(Benchmark.runQuantified(spec, false, name, -1, -1, TIMEOUT_MS));
-                out.add(Benchmark.runQuantified(spec, true,  name, -1, -1, TIMEOUT_MS));
-                out.add(Benchmark.runGrounded(spec, false, name, -1, -1, TIMEOUT_MS, xmt));
-                out.add(Benchmark.runGrounded(spec, true,  name, -1, -1, TIMEOUT_MS, xmt));
-                out.add(Benchmark.runHybridRestarts(spec, name, -1, -1));
-            }
-        }
+        out.add(Benchmark.runExplicit(inst.spec(), Symmetry.NONE, source, DENSITY, tightness, MAX_RELEASE, u, seed, Scheduler.TIMEOUT_MS));
+        out.add(Benchmark.runExplicit(inst.spec(), Symmetry.UNPERMUTED, source, DENSITY, tightness, MAX_RELEASE, u, seed, Scheduler.TIMEOUT_MS));
+        out.add(Benchmark.runExplicit(inst.spec(), Symmetry.GREEDY, source, DENSITY, tightness, MAX_RELEASE, u, seed, Scheduler.TIMEOUT_MS));
+        out.add(Benchmark.runRestarts(inst.spec(), source, DENSITY, tightness, MAX_RELEASE, u, seed));
         return out;
     }
 
-    private static void write(List<BenchResult> results) throws IOException {
-        Files.createDirectories(OUT_CSV.getParent());
-        List<String> lines = new ArrayList<>();
-        lines.add(BenchResult.csvHeader());
-        results.forEach(r -> lines.add(r.toCsv()));
-        Files.write(OUT_CSV, lines);
-        System.out.println("wrote " + results.size() + " rows -> " + OUT_CSV.toAbsolutePath());
-    }
-
-    /** Each spec now produces 7 consecutive rows: basic(off,on), quantified(off,on), grounded(off,on), restart-hybrid. */
     private static void summarise(List<BenchResult> results) {
-        System.out.printf("%n%-6s %-6s %-6s %-8s %9s %9s %9s %9s %9s %9s %9s %10s%n",
-                "src", "n", "cores", "density", "bas-off", "bas-on", "qnt-off", "qnt-on", "grd-off", "grd-on", "restart", "status");
-        for (int i = 0; i + 6 < results.size(); i += 7) {
-            BenchResult basOff = results.get(i),     basOn = results.get(i + 1);
-            BenchResult qntOff = results.get(i + 2), qntOn = results.get(i + 3);
-            BenchResult grdOff = results.get(i + 4), grdOn = results.get(i + 5);
-            BenchResult restart = results.get(i + 6);
-            System.out.printf("%-6s %-6d %-6d %-8.2f %9d %9d %9d %9d %9d %9d %9d %10s%n",
-                    basOff.source(), basOff.nTasks(), basOff.cores(), basOff.density(),
-                    basOff.solveMs(), basOn.solveMs(), qntOff.solveMs(), qntOn.solveMs(),
-                    grdOff.solveMs(), grdOn.solveMs(), restart.solveMs(), basOff.status());
+        System.out.printf("%n%-3s %-4s %-5s %-6s %-5s %-4s %9s %9s %9s %9s %14s%n",
+                "src", "n", "cores", "tight", "util", "seed", "exp-non", "exp-unp", "exp-grd", "restart", "status");
+        for (int i = 0; i + ARMS - 1 < results.size(); i += ARMS) {
+            BenchResult first = results.get(i);
+            StringBuilder row = new StringBuilder(String.format("%-3s %-4d %-5d %-6.3f %-5.2f %-4d",
+                    first.source(), first.nTasks(), first.cores(), first.tightness(), first.utilisation(), first.seed()));
+            for (int k = 0; k < ARMS; k++) row.append(String.format(" %9d", results.get(i + k).totalMs()));
+            row.append(String.format(" %14s", first.status()));
+            System.out.println(row);
         }
     }
 }

@@ -16,27 +16,42 @@ public final class CorePermutation {
 
     public static int[] fromGreedySchedule(Spec spec) {
         int n = spec.processors();
+        List<Spec.TaskDef> ts = spec.tasks();
         Map<String, Integer> greedyCore = greedySchedule(spec);
 
-        int[] sigma = new int[n];
-        Arrays.fill(sigma, -1);
-        boolean[] used = new boolean[n];
-        int nextLabel = 0;
+        int[] firstUse = new int[n];
+        Arrays.fill(firstUse, -1);
+        int nextRank = 0;
 
-        for (Spec.TaskDef t : spec.tasks()) {
+        for (Spec.TaskDef t : ts) {
             int c = greedyCore.get(t.id());
-            if (!used[c]) {
-                used[c] = true;
-                sigma[c] = nextLabel++;
+            if (firstUse[c] == -1) {
+                firstUse[c] = nextRank++;
             }
         }
 
-        for (int c = 0; c < n; c++) {
-            if (sigma[c] == -1) {
-                sigma[c] = nextLabel++;
-            }
+        Integer[] order = new Integer[ts.size()];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        Arrays.sort(order, Comparator.comparingInt(i -> firstUse[greedyCore.get(ts.get(i).id())]));
+
+        int[] out = new int[order.length];
+        for (int i = 0; i < order.length; i++) out[i] = order[i];
+        return out;
+    }
+
+    public static int[] unpermuted(Spec spec) {
+        int[] order = new int[spec.tasks().size()];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        return order;
+    }
+
+    public static int[] shuffled(Spec spec, Random rng) {
+        int[] order = unpermuted(spec);
+        for (int i = order.length - 1; i > 0; i--) {
+            int j = rng.nextInt(i + 1);
+            int tmp = order[i]; order[i] = order[j]; order[j] = tmp;
         }
-        return sigma;
+        return order;
     }
 
     private static Map<String, Integer> greedySchedule(Spec spec) {

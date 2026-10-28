@@ -1,0 +1,507 @@
+{
+  "processors": 8,
+  "tasks": [
+    {
+      "id": "ingest0",
+      "duration": 10,
+      "deadline": 13
+    },
+    {
+      "id": "ingest1",
+      "duration": 8,
+      "deadline": 11
+    },
+    {
+      "id": "ingest2",
+      "duration": 3,
+      "deadline": 7
+    },
+    {
+      "id": "ingest3",
+      "duration": 10,
+      "deadline": 17
+    },
+    {
+      "id": "ingest4",
+      "duration": 10,
+      "deadline": 14
+    },
+    {
+      "id": "ingest5",
+      "duration": 12,
+      "deadline": 20
+    },
+    {
+      "id": "clean0",
+      "duration": 8,
+      "deadline": 27,
+      "after": [
+        "ingest3"
+      ]
+    },
+    {
+      "id": "clean1",
+      "duration": 14,
+      "deadline": 32,
+      "after": [
+        "ingest1"
+      ]
+    },
+    {
+      "id": "clean2",
+      "duration": 7,
+      "deadline": 25,
+      "after": [
+        "ingest1",
+        "ingest5"
+      ]
+    },
+    {
+      "id": "validate0",
+      "duration": 3,
+      "deadline": 26,
+      "after": [
+        "ingest1",
+        "ingest5"
+      ]
+    },
+    {
+      "id": "validate1",
+      "duration": 6,
+      "deadline": 37,
+      "after": [
+        "clean1"
+      ]
+    },
+    {
+      "id": "validate2",
+      "duration": 8,
+      "deadline": 38,
+      "after": [
+        "clean2"
+      ]
+    },
+    {
+      "id": "validate3",
+      "duration": 11,
+      "deadline": 30,
+      "after": [
+        "ingest3",
+        "ingest1"
+      ]
+    },
+    {
+      "id": "normalize0",
+      "duration": 5,
+      "deadline": 36,
+      "after": [
+        "clean0",
+        "clean1"
+      ]
+    },
+    {
+      "id": "normalize1",
+      "duration": 6,
+      "deadline": 43,
+      "after": [
+        "validate2",
+        "clean2"
+      ]
+    },
+    {
+      "id": "normalize2",
+      "duration": 7,
+      "deadline": 48,
+      "after": [
+        "validate2"
+      ]
+    },
+    {
+      "id": "normalize3",
+      "duration": 12,
+      "deadline": 56,
+      "after": [
+        "clean0",
+        "validate1",
+        "clean1"
+      ]
+    },
+    {
+      "id": "normalize4",
+      "duration": 5,
+      "deadline": 32,
+      "after": [
+        "validate0"
+      ]
+    },
+    {
+      "id": "normalize5",
+      "duration": 12,
+      "deadline": 46,
+      "after": [
+        "validate1",
+        "clean1",
+        "clean2"
+      ]
+    },
+    {
+      "id": "transform0",
+      "duration": 15,
+      "deadline": 62,
+      "after": [
+        "normalize1"
+      ]
+    },
+    {
+      "id": "transform1",
+      "duration": 3,
+      "deadline": 59,
+      "after": [
+        "normalize5"
+      ]
+    },
+    {
+      "id": "transform2",
+      "duration": 5,
+      "deadline": 57,
+      "after": [
+        "normalize3",
+        "normalize2",
+        "normalize5"
+      ]
+    },
+    {
+      "id": "transform3",
+      "duration": 4,
+      "deadline": 39,
+      "after": [
+        "normalize4"
+      ]
+    },
+    {
+      "id": "transform4",
+      "duration": 13,
+      "deadline": 61,
+      "after": [
+        "normalize2",
+        "normalize5",
+        "normalize1"
+      ]
+    },
+    {
+      "id": "enrich0",
+      "duration": 10,
+      "deadline": 51,
+      "after": [
+        "normalize1",
+        "normalize0"
+      ]
+    },
+    {
+      "id": "enrich1",
+      "duration": 12,
+      "deadline": 86,
+      "after": [
+        "transform4"
+      ]
+    },
+    {
+      "id": "enrich2",
+      "duration": 3,
+      "deadline": 72,
+      "after": [
+        "transform0",
+        "transform3"
+      ]
+    },
+    {
+      "id": "enrich3",
+      "duration": 6,
+      "deadline": 71,
+      "after": [
+        "normalize0",
+        "normalize1",
+        "transform2"
+      ]
+    },
+    {
+      "id": "feature0",
+      "duration": 7,
+      "deadline": 72,
+      "after": [
+        "transform4"
+      ]
+    },
+    {
+      "id": "feature1",
+      "duration": 9,
+      "deadline": 75,
+      "after": [
+        "transform4"
+      ]
+    },
+    {
+      "id": "feature2",
+      "duration": 10,
+      "deadline": 89,
+      "after": [
+        "transform4"
+      ]
+    },
+    {
+      "id": "feature3",
+      "duration": 11,
+      "deadline": 67,
+      "after": [
+        "transform2"
+      ]
+    },
+    {
+      "id": "aggregate0",
+      "duration": 10,
+      "deadline": 83,
+      "after": [
+        "enrich0",
+        "feature0",
+        "enrich2"
+      ]
+    },
+    {
+      "id": "aggregate1",
+      "duration": 3,
+      "deadline": 78,
+      "after": [
+        "feature0",
+        "enrich1"
+      ]
+    },
+    {
+      "id": "aggregate2",
+      "duration": 11,
+      "deadline": 98,
+      "after": [
+        "enrich1"
+      ]
+    },
+    {
+      "id": "aggregate3",
+      "duration": 15,
+      "deadline": 91,
+      "after": [
+        "enrich2"
+      ]
+    },
+    {
+      "id": "join0",
+      "duration": 9,
+      "deadline": 102,
+      "after": [
+        "feature2",
+        "aggregate3",
+        "aggregate0"
+      ]
+    },
+    {
+      "id": "join1",
+      "duration": 5,
+      "deadline": 103,
+      "after": [
+        "feature3",
+        "aggregate1",
+        "feature2"
+      ]
+    },
+    {
+      "id": "join2",
+      "duration": 12,
+      "deadline": 96,
+      "after": [
+        "aggregate3",
+        "aggregate0"
+      ]
+    },
+    {
+      "id": "join3",
+      "duration": 5,
+      "deadline": 80,
+      "after": [
+        "feature1"
+      ]
+    },
+    {
+      "id": "join4",
+      "duration": 11,
+      "deadline": 92,
+      "after": [
+        "feature3",
+        "aggregate0",
+        "feature1"
+      ]
+    },
+    {
+      "id": "join5",
+      "duration": 13,
+      "deadline": 98,
+      "after": [
+        "feature0",
+        "feature1",
+        "aggregate3"
+      ]
+    },
+    {
+      "id": "join6",
+      "duration": 3,
+      "deadline": 85,
+      "after": [
+        "feature3",
+        "feature2",
+        "aggregate1"
+      ]
+    },
+    {
+      "id": "model0",
+      "duration": 10,
+      "deadline": 114,
+      "after": [
+        "join5"
+      ]
+    },
+    {
+      "id": "model1",
+      "duration": 5,
+      "deadline": 99,
+      "after": [
+        "join2",
+        "aggregate3"
+      ]
+    },
+    {
+      "id": "model2",
+      "duration": 12,
+      "deadline": 118,
+      "after": [
+        "join1",
+        "join2"
+      ]
+    },
+    {
+      "id": "model3",
+      "duration": 15,
+      "deadline": 119,
+      "after": [
+        "aggregate0",
+        "aggregate1",
+        "join6"
+      ]
+    },
+    {
+      "id": "evaluate0",
+      "duration": 7,
+      "deadline": 88,
+      "after": [
+        "join3"
+      ]
+    },
+    {
+      "id": "evaluate1",
+      "duration": 10,
+      "deadline": 116,
+      "after": [
+        "join2",
+        "join6"
+      ]
+    },
+    {
+      "id": "evaluate2",
+      "duration": 9,
+      "deadline": 118,
+      "after": [
+        "join1"
+      ]
+    },
+    {
+      "id": "evaluate3",
+      "duration": 3,
+      "deadline": 106,
+      "after": [
+        "model3"
+      ]
+    },
+    {
+      "id": "evaluate4",
+      "duration": 3,
+      "deadline": 111,
+      "after": [
+        "join2"
+      ]
+    },
+    {
+      "id": "evaluate5",
+      "duration": 9,
+      "deadline": 93,
+      "after": [
+        "join6"
+      ]
+    },
+    {
+      "id": "evaluate6",
+      "duration": 8,
+      "deadline": 104,
+      "after": [
+        "join6"
+      ]
+    },
+    {
+      "id": "report0",
+      "duration": 6,
+      "deadline": 110,
+      "after": [
+        "evaluate4",
+        "evaluate3"
+      ]
+    },
+    {
+      "id": "report1",
+      "duration": 6,
+      "deadline": 135,
+      "after": [
+        "model0"
+      ]
+    },
+    {
+      "id": "report2",
+      "duration": 10,
+      "deadline": 116,
+      "after": [
+        "evaluate1"
+      ]
+    },
+    {
+      "id": "report3",
+      "duration": 11,
+      "deadline": 111,
+      "after": [
+        "evaluate4",
+        "evaluate6"
+      ]
+    },
+    {
+      "id": "report4",
+      "duration": 10,
+      "deadline": 140,
+      "after": [
+        "model2"
+      ]
+    },
+    {
+      "id": "report5",
+      "duration": 3,
+      "deadline": 108,
+      "after": [
+        "model3",
+        "evaluate2",
+        "model1"
+      ]
+    }
+  ]
+}

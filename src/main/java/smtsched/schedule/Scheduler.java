@@ -4,6 +4,7 @@ import com.microsoft.z3.*;
 
 import smtsched.encode.CorePermutation;
 import smtsched.encode.Encoder;
+import smtsched.encode.Symmetry;
 import smtsched.encode.TextEncoder;
 import smtsched.encode.XmtEncoder;
 import smtsched.ground.Grounder;
@@ -22,9 +23,9 @@ import java.util.Random;
  */
 public class Scheduler {
 
-    private static final int TIMEOUT_MS = 40000;
-    public static final int RESTART_SLICE_MS = 3000;
+    public static final int TIMEOUT_MS = 10000;
     private static final int RESTART_MAX_SLICES = 4;
+    public static final int RESTART_SLICE_MS = TIMEOUT_MS / RESTART_MAX_SLICES;
 
     public enum Outcome { SCHEDULABLE, UNSCHEDULABLE, TIMEOUT }
 
@@ -35,10 +36,10 @@ public class Scheduler {
     public record LateResult(boolean solved, List<Encoder.LateAssignment> assignments) {}
 
     /** Baseline: object encoder, deadlines hard. */
-    public Result solve(Spec spec, boolean symmetryBreaking) {
+    public Result solve(Spec spec, Symmetry symmetry) {
         try (Context ctx = new Context()) {
             Solver z3 = newSolver(ctx);
-            Encoder encoder = new Encoder(ctx, spec, symmetryBreaking);
+            Encoder encoder = new Encoder(ctx, spec, symmetry);
             encoder.assertInto(z3);
 
             Status status = z3.check();
@@ -60,7 +61,7 @@ public class Scheduler {
 
     private Result solveWithRestarts(Spec spec, boolean greedyFirst) {
         try (Context ctx = new Context()) {
-            Encoder encoder = new Encoder(ctx, spec, false); // symmetry applied manually per slice below
+            Encoder encoder = new Encoder(ctx, spec, Symmetry.NONE); // symmetry applied manually per slice below
             Solver z3 = ctx.mkSolver();
 
             Params sliceParams = ctx.mkParams();
@@ -72,10 +73,10 @@ public class Scheduler {
             Random rng = new Random();
             for (int slice = 0; slice < RESTART_MAX_SLICES; slice++) {
                 z3.push();
-                int[] sigma = (greedyFirst && slice == 0)
+                int[] order = (greedyFirst && slice == 0)
                         ? CorePermutation.fromGreedySchedule(spec)
-                        : randomPermutation(spec.processors(), rng);
-                encoder.assertCoreSymmetryInto(z3, sigma);
+                        : CorePermutation.shuffled(spec, rng);
+                encoder.assertCoreSymmetryInto(z3, order);
 
                 Status status = z3.check();
                 if (status == Status.SATISFIABLE) {
@@ -95,8 +96,8 @@ public class Scheduler {
      * Pass NoGround to hand the quantifiers straight to z3 (its own E-matching);
      * pass RustGrounder to have xmt-lib expand them first.
      */
-    public Result solveText(Spec spec, boolean symmetryBreaking, Grounder grounder) {
-        TextEncoder encoder = new TextEncoder(spec, symmetryBreaking);
+    public Result solveText(Spec spec, Symmetry symmetry, Grounder grounder) {
+        TextEncoder encoder = new TextEncoder(spec, symmetry);
         String grounded = grounder.ground(encoder.encode());
 
         try (Context ctx = new Context()) {
@@ -110,8 +111,8 @@ public class Scheduler {
         }
     }
 
-    public Result solveGrounded(Spec spec, boolean symmetryBreaking, Grounder grounder) {
-        XmtEncoder encoder = new XmtEncoder(spec, symmetryBreaking);
+    public Result solveGrounded(Spec spec, Symmetry symmetry, Grounder grounder) {
+        XmtEncoder encoder = new XmtEncoder(spec, symmetry);
         String grounded = stripUnusedDeclarations(grounder.ground(encoder.encode()));
 
         try (Context ctx = new Context()) {
@@ -131,7 +132,7 @@ public class Scheduler {
             Optimize opt = ctx.mkOptimize();
             opt.setParameters(timeout(ctx));
 
-            Encoder encoder = new Encoder(ctx, spec, symmetryBreaking);
+            Encoder encoder = new Encoder(ctx, spec, symmetryBreaking ? Symmetry.GREEDY : Symmetry.NONE);
             encoder.assertLatenessInto(opt);
 
             return opt.Check() == Status.SATISFIABLE
@@ -195,22 +196,11 @@ public class Scheduler {
         return out;
     }
 
-    private String stripUnusedDeclarations(String smtlib) {
+    public static String stripUnusedDeclarations(String smtlib) {
         return smtlib.lines()
                 .filter(line -> !line.startsWith("(declare-fun Task") && !line.startsWith("(declare-fun Pair"))
                 .reduce(new StringBuilder(), (sb, line) -> sb.append(line).append('\n'), StringBuilder::append)
                 .toString();
-    }
-
-    
-    private static int[] randomPermutation(int n, Random rng) {
-        int[] p = new int[n];
-        for (int i = 0; i < n; i++) p[i] = i;
-        for (int i = n - 1; i > 0; i--) {
-            int j = rng.nextInt(i + 1);
-            int tmp = p[i]; p[i] = p[j]; p[j] = tmp;
-        }
-        return p;
     }
 
 }

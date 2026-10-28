@@ -32,7 +32,7 @@ public class Encoder {
 
     private final Context ctx;
     private final Spec spec;
-    private final boolean isSymmetryBreaking;
+    private final Symmetry symmetry;
 
     private final Map<String, IntExpr> start = new LinkedHashMap<>();
     private final Map<String, IntExpr> proc = new LinkedHashMap<>();
@@ -46,10 +46,10 @@ public class Encoder {
      * Declares one {@code start}/{@code proc} integer variable per task and caches
      * each task's duration for reuse in constraint building and decoding.
      */
-    public Encoder(Context ctx, Spec spec, boolean isSymmetryBreaking) {
+    public Encoder(Context ctx, Spec spec, Symmetry symmetry) {
         this.ctx = ctx;
         this.spec = spec;
-        this.isSymmetryBreaking = isSymmetryBreaking;
+        this.symmetry = symmetry;
         for (Spec.TaskDef t : spec.tasks()) {
             start.put(t.id(), ctx.mkIntConst("start_" + t.id()));
             proc.put(t.id(),  ctx.mkIntConst("proc_"  + t.id()));
@@ -67,20 +67,20 @@ public class Encoder {
     }
 
     /** Symmetry breaking alone, under an explicit permutation — used by the restart loops in Scheduler. */
-    public void assertCoreSymmetryInto(Solver solver, int[] sigma) {
-        addCoreSymmetry(solver::add, sigma);
+    public void assertCoreSymmetryInto(Solver solver, int[] order) {
+        addCoreSymmetry(solver::add, order);
     }
 
     /** Hard-deadline satisfiability. */
     public void assertInto(Solver solver) {
         assertBaseInto(solver);
-        if (isSymmetryBreaking) assertCoreSymmetryInto(solver, CorePermutation.fromGreedySchedule(spec));
+        if (symmetry != Symmetry.NONE) assertCoreSymmetryInto(solver, taskOrder());
     }
 
     /** Soft-deadline lateness minimisation. */
     public void assertLatenessInto(Optimize opt) {
         addCore(opt::Add);
-        if (isSymmetryBreaking) addSymmetry(opt::Add);
+        if (symmetry != Symmetry.NONE) addSymmetry(opt::Add);
         addLateness(opt);
     }
 
@@ -142,38 +142,29 @@ public class Encoder {
     }
 
     private void addSymmetry(Consumer<BoolExpr> add) {
-        addCoreSymmetry(add, CorePermutation.fromGreedySchedule(spec));
+        addCoreSymmetry(add, taskOrder());
     }
 
-    private void addCoreSymmetry(Consumer<BoolExpr> add, int[] sigma) {
+    private int[] taskOrder() {
+        return symmetry == Symmetry.GREEDY ? CorePermutation.fromGreedySchedule(spec) : CorePermutation.unpermuted(spec);
+    }
+
+    private void addCoreSymmetry(Consumer<BoolExpr> add, int[] order) {
         List<Spec.TaskDef> ts = spec.tasks();
         if(ts.isEmpty()) return;
 
-        IntExpr canon0 = canonExpr(ts.get(0), sigma, add);
-        add.accept(ctx.mkEq(canon0, ctx.mkInt(0)));
+        IntExpr proc0 = proc.get(ts.get(order[0]).id());
+        add.accept(ctx.mkEq(proc0, ctx.mkInt(0)));
 
-        IntExpr prevMax = canon0;
-        for(int i = 1; i < ts.size(); i++) {
-            IntExpr canonI = canonExpr(ts.get(i), sigma, add);
-            add.accept(ctx.mkLe(canonI, ctx.mkAdd(prevMax, ctx.mkInt(1))));
+        IntExpr prevMax = proc0;
+        for(int i = 1; i < order.length; i++) {
+            IntExpr procI = proc.get(ts.get(order[i]).id());
+            add.accept(ctx.mkLe(procI, ctx.mkAdd(prevMax, ctx.mkInt(1))));
             IntExpr maxI = (IntExpr) ctx.mkFreshConst("maxUsed", ctx.getIntSort());
-            add.accept(ctx.mkEq(maxI, ctx.mkITE(ctx.mkGt(canonI, prevMax), canonI, prevMax)));
+            add.accept(ctx.mkEq(maxI, ctx.mkITE(ctx.mkGt(procI, prevMax), procI, prevMax)));
             prevMax = maxI;
         }
 
-    }
-
-    private IntExpr canonExpr(Spec.TaskDef t, int[] sigma, Consumer<BoolExpr> add) {
-        IntExpr p = proc.get(t.id());
-        IntExpr canon = (IntExpr) ctx.mkFreshConst("canon_" + t.id(), ctx.getIntSort());
-
-        Expr<IntSort> chain = ctx.mkInt(sigma[sigma.length - 1]);
-        for(int k = sigma.length - 2; k >= 0; k--) {
-            chain = ctx.mkITE(ctx.mkEq(p, ctx.mkInt(k)), ctx.mkInt(sigma[k]), chain);
-        }
-
-        add.accept(ctx.mkEq(canon, chain));
-        return canon;
     }
 
 

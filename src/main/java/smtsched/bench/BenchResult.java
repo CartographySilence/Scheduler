@@ -1,5 +1,7 @@
 package smtsched.bench;
 
+import smtsched.encode.Symmetry;
+
 /**
  * 
  * BenchResult
@@ -15,11 +17,11 @@ package smtsched.bench;
  * @param solveMs solve time in milliseconds
  * @param assertions number of assertions passed into the solver
  */
-public record BenchResult(String source, String mode, int nTasks, int cores, double density, long seed, boolean symmetry, String status, long solveMs, int assertions) {
+public record BenchResult(String source, String mode, int nTasks, int cores, double density, double tightness, long maxRelease, double utilisation, long seed, Symmetry symmetry, String status, long solveMs, long totalMs, int assertions) {
     public static String csvHeader() {
-        return "source,mode,nTasks,cores,density,seed,symmetry,status,solveMs,assertions";
+        return "source,mode,nTasks,cores,density,tightness,maxRelease,utilisation,seed,symmetry,status,solveMs,totalMs,assertions";
     }
     public String toCsv() {
-        return String.join(",", source, mode, ""+nTasks, ""+cores, ""+density, ""+seed, ""+symmetry, status, ""+solveMs, ""+assertions);
+        return String.join(",", source, mode, ""+nTasks, ""+cores, ""+density, ""+tightness, ""+maxRelease, ""+utilisation, ""+seed, ""+symmetry, status, ""+solveMs, ""+totalMs, ""+assertions);
     }
 }
