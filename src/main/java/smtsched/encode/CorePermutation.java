@@ -8,8 +8,7 @@ import java.util.*;
  *
  * CorePermutation
  * Derives a core-labeling permutation from a cheap greedy schedule, for use as symmetry-breaking's
- * canonical order. No Z3 involved here — just Spec in, int[] out — so both Encoder and the text
- * encoders can call it.
+ * canonical order.
  */
 public final class CorePermutation {
     private CorePermutation() {}

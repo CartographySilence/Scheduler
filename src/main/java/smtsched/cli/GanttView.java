@@ -5,7 +5,7 @@ import smtsched.encode.Encoder.LateAssignment;
 import java.util.Arrays;
 import java.util.List;
 
-/** Renders a schedule as a coloured CLI Gantt chart, paged to fit the terminal. */
+/** Renders a schedule as a coloured CLI Gantt chart. */
 public final class GanttView {
 
     private static final String RESET = "\u001B[0m";

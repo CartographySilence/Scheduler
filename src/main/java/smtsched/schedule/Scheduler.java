@@ -154,14 +154,14 @@ public class Scheduler {
         return p;
     }
 
-    /** UNKNOWN means the budget ran out — not that the problem is infeasible. */
+    /** UNKNOWN means the budget ran out and not that the problem is infeasible. */
     private Outcome outcomeOf(Status status) {
         return status == Status.UNSATISFIABLE ? Outcome.UNSCHEDULABLE : Outcome.TIMEOUT;
     }
 
     /**
      * Decode a model built from parsed text. We hold no IntExpr handles here (z3
-     * created the symbols from the string), so rebuild the function declarations by
+     * created the symbols from the string), rebuild the function declarations by
      * name, evaluate them at each task index, and map the index back to a task name.
      */
     private List<Encoder.Assignment> decodeText(Context ctx, Model model, TextEncoder encoder, Spec spec) {
